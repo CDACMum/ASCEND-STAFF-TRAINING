@@ -507,6 +507,7 @@ async function render(){
       notes:viewNotes, note:viewNote, prereq:viewPrereq,
       assignments:viewAssignments, assignment:viewAssignment,
       quizzes:viewQuizzes, quiz:viewQuiz,
+      playground:viewPlayground,
       capstone:viewCapstone,
       schedule:viewSchedule, recordings:viewRecordings, session:viewSession,
       forum:viewForum, thread:viewThread,
@@ -629,6 +630,7 @@ function navForRole(){
     {name:"notes",label:"Faculty notes",icon:I.note},
     {name:"assignments",label:"Assignments",icon:I.clip},
     {name:"quizzes",label:"Practice quizzes",icon:I.quiz},
+    {name:"playground",label:"Python playground",icon:I.git},
     {name:"capstone",label:"Capstone project",icon:I.rocket},
     {name:"forum",label:"Discussion forum",icon:I.chat},
   ];
@@ -880,6 +882,144 @@ function assignmentRow(a,courses){
 /* =============================================================== COURSES */
 /* Render our plain-text notes/syllabus (─── dividers, indented code, • bullets)
    into clean formatted HTML. */
+/* ---------------- educational SVG diagrams (referenced from notes via @svg name) ---- */
+const SVGS = {
+  normal:`<svg viewBox="0 0 640 300" class="edu" role="img" aria-label="Normal distribution">
+    <line x1="40" y1="250" x2="610" y2="250" stroke="#c9d3e6" stroke-width="2"/>
+    <path d="M40 250 C 190 250, 250 70, 325 70 C 400 70, 460 250, 610 250 Z" fill="rgba(90,47,158,.12)" stroke="#5a2f9e" stroke-width="3"/>
+    <line x1="325" y1="70" x2="325" y2="250" stroke="#f2661f" stroke-width="2.5" stroke-dasharray="7 5"/>
+    <text x="325" y="275" text-anchor="middle" font-size="15" fill="#0e1a35" font-weight="700">Mean = Median = Mode</text>
+    <text x="50" y="42" font-size="14" fill="#5a6a89" font-weight="600">Symmetric (Normal) distribution — the classic bell curve</text></svg>`,
+  skew:`<svg viewBox="0 0 640 320" class="edu" role="img" aria-label="Right-skewed distribution">
+    <text x="50" y="34" font-size="14" fill="#5a6a89" font-weight="600">Right-skew (positive): a few large values pull the tail right</text>
+    <line x1="40" y1="270" x2="610" y2="270" stroke="#c9d3e6" stroke-width="2"/>
+    <path d="M40 270 C 130 270, 150 90, 210 90 C 300 90, 360 270, 610 270 Z" fill="rgba(15,125,140,.12)" stroke="#0f7d8c" stroke-width="3"/>
+    <line x1="210" y1="90" x2="210" y2="270" stroke="#127a45" stroke-width="2" stroke-dasharray="6 5"/>
+    <text x="210" y="288" text-anchor="middle" font-size="13" fill="#127a45" font-weight="700">Mode</text>
+    <line x1="250" y1="150" x2="250" y2="270" stroke="#5a2f9e" stroke-width="2" stroke-dasharray="6 5"/>
+    <text x="250" y="306" text-anchor="middle" font-size="13" fill="#5a2f9e" font-weight="700">Median</text>
+    <line x1="300" y1="200" x2="300" y2="270" stroke="#f2661f" stroke-width="2.5" stroke-dasharray="6 5"/>
+    <text x="325" y="240" font-size="13" fill="#f2661f" font-weight="700">Mean (dragged by outliers)</text>
+    <text x="360" y="120" font-size="13" fill="#5a6a89">➜ long right tail</text></svg>`,
+  confusion:`<svg viewBox="0 0 640 360" class="edu" role="img" aria-label="Confusion matrix">
+    <text x="330" y="26" text-anchor="middle" font-size="15" fill="#0e1a35" font-weight="700">Confusion Matrix — disease screening (1000 patients)</text>
+    <text x="330" y="58" text-anchor="middle" font-size="13" fill="#5a6a89" font-weight="600">PREDICTED</text>
+    <text x="300" y="230" text-anchor="middle" font-size="13" fill="#5a6a89" font-weight="600" transform="rotate(-90 40 210)">ACTUAL</text>
+    <text x="210" y="80" text-anchor="middle" font-size="12" fill="#5a6a89">Positive (sick)</text>
+    <text x="430" y="80" text-anchor="middle" font-size="12" fill="#5a6a89">Negative (healthy)</text>
+    <text x="70" y="150" text-anchor="middle" font-size="12" fill="#5a6a89" transform="rotate(-90 70 150)">Positive</text>
+    <text x="70" y="270" text-anchor="middle" font-size="12" fill="#5a6a89" transform="rotate(-90 70 270)">Negative</text>
+    <rect x="120" y="95" width="180" height="110" fill="#e7f5ee" stroke="#8fd3ad" stroke-width="2"/>
+    <text x="210" y="140" text-anchor="middle" font-size="15" fill="#127a45" font-weight="700">TP = 90</text>
+    <text x="210" y="164" text-anchor="middle" font-size="12" fill="#127a45">True Positive</text>
+    <rect x="300" y="95" width="180" height="110" fill="#fdecea" stroke="#f2c4bf" stroke-width="2"/>
+    <text x="390" y="140" text-anchor="middle" font-size="15" fill="#c0480f" font-weight="700">FN = 10</text>
+    <text x="390" y="164" text-anchor="middle" font-size="12" fill="#c0480f">False Negative (missed!)</text>
+    <rect x="120" y="205" width="180" height="110" fill="#fdecea" stroke="#f2c4bf" stroke-width="2"/>
+    <text x="210" y="250" text-anchor="middle" font-size="15" fill="#c0480f" font-weight="700">FP = 80</text>
+    <text x="210" y="274" text-anchor="middle" font-size="12" fill="#c0480f">False Positive (false alarm)</text>
+    <rect x="300" y="205" width="180" height="110" fill="#e2f0fb" stroke="#a9cdeb" stroke-width="2"/>
+    <text x="390" y="250" text-anchor="middle" font-size="15" fill="#155a94" font-weight="700">TN = 820</text>
+    <text x="390" y="274" text-anchor="middle" font-size="12" fill="#155a94">True Negative</text>
+    <text x="510" y="150" font-size="12.5" fill="#0e1a35">Recall/Sensitivity</text>
+    <text x="510" y="168" font-size="12.5" fill="#5a6a89">= 90/(90+10) = 0.90</text>
+    <text x="510" y="230" font-size="12.5" fill="#0e1a35">Specificity</text>
+    <text x="510" y="248" font-size="12.5" fill="#5a6a89">= 820/(820+80)=0.91</text>
+    <text x="210" y="336" text-anchor="middle" font-size="12.5" fill="#0e1a35">Precision = 90/(90+80) = 0.53</text></svg>`,
+  type12:`<svg viewBox="0 0 640 340" class="edu" role="img" aria-label="Type I and Type II errors">
+    <text x="330" y="26" text-anchor="middle" font-size="15" fill="#0e1a35" font-weight="700">Type I vs Type II error — the fire-alarm story</text>
+    <text x="330" y="58" text-anchor="middle" font-size="13" fill="#5a6a89" font-weight="600">REALITY</text>
+    <text x="210" y="82" text-anchor="middle" font-size="12" fill="#5a6a89">No fire (H₀ true)</text>
+    <text x="430" y="82" text-anchor="middle" font-size="12" fill="#5a6a89">Fire! (H₀ false)</text>
+    <text x="66" y="150" text-anchor="middle" font-size="12" fill="#5a6a89" transform="rotate(-90 66 150)">Alarm rings</text>
+    <text x="66" y="265" text-anchor="middle" font-size="12" fill="#5a6a89" transform="rotate(-90 66 265)">Alarm silent</text>
+    <rect x="120" y="95" width="200" height="105" fill="#fdecea" stroke="#f2c4bf" stroke-width="2"/>
+    <text x="220" y="135" text-anchor="middle" font-size="14" fill="#c0480f" font-weight="700">TYPE I error (α)</text>
+    <text x="220" y="158" text-anchor="middle" font-size="12" fill="#c0480f">False alarm — reject a true H₀</text>
+    <rect x="320" y="95" width="200" height="105" fill="#e7f5ee" stroke="#8fd3ad" stroke-width="2"/>
+    <text x="420" y="140" text-anchor="middle" font-size="13" fill="#127a45" font-weight="700">Correct ✓ (power)</text>
+    <rect x="120" y="200" width="200" height="105" fill="#e7f5ee" stroke="#8fd3ad" stroke-width="2"/>
+    <text x="220" y="245" text-anchor="middle" font-size="13" fill="#127a45" font-weight="700">Correct ✓</text>
+    <rect x="320" y="200" width="200" height="105" fill="#fdeee7" stroke="#f6d3c4" stroke-width="2"/>
+    <text x="420" y="240" text-anchor="middle" font-size="14" fill="#c0480f" font-weight="700">TYPE II error (β)</text>
+    <text x="420" y="263" text-anchor="middle" font-size="12" fill="#c0480f">Missed fire — fail to reject false H₀</text></svg>`,
+  roc:`<svg viewBox="0 0 640 340" class="edu" role="img" aria-label="ROC curve">
+    <text x="320" y="24" text-anchor="middle" font-size="15" fill="#0e1a35" font-weight="700">ROC curve &amp; AUC</text>
+    <line x1="90" y1="290" x2="560" y2="290" stroke="#0e1a35" stroke-width="2"/>
+    <line x1="90" y1="290" x2="90" y2="50" stroke="#0e1a35" stroke-width="2"/>
+    <line x1="90" y1="290" x2="560" y2="50" stroke="#8b98b3" stroke-width="2" stroke-dasharray="7 6"/>
+    <text x="330" y="200" font-size="12" fill="#8b98b3" transform="rotate(-24 330 200)">random guess (AUC 0.5)</text>
+    <path d="M90 290 C 130 130, 230 70, 560 50" fill="rgba(90,47,158,.12)" stroke="#5a2f9e" stroke-width="3"/>
+    <text x="300" y="120" font-size="13" fill="#5a2f9e" font-weight="700">good model (AUC → 1.0)</text>
+    <text x="325" y="320" text-anchor="middle" font-size="12.5" fill="#5a6a89">False Positive Rate (1 − specificity)</text>
+    <text x="60" y="170" text-anchor="middle" font-size="12.5" fill="#5a6a89" transform="rotate(-90 60 170)">True Positive Rate (recall)</text></svg>`,
+};
+
+/* ---------------- in-browser Python (Pyodide) for runnable pandas/numpy cells ------- */
+function loadScriptOnce(src){ return new Promise((res,rej)=>{ if([...document.scripts].some(s=>s.src===src)) return res(); const s=document.createElement("script"); s.src=src; s.onload=()=>res(); s.onerror=()=>rej(new Error("load failed")); document.head.appendChild(s); }); }
+const Py = {
+  _p:null, _loading:null,
+  async get(onStatus){
+    if(this._p) return this._p;
+    if(this._loading) return this._loading;
+    this._loading=(async()=>{
+      onStatus&&onStatus("Loading Python (first run downloads ~10 MB, ~15–25 s)…");
+      await loadScriptOnce("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js");
+      const p=await window.loadPyodide({indexURL:"https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"});
+      onStatus&&onStatus("Loading numpy & pandas…");
+      await p.loadPackage(["numpy","pandas"]);
+      this._p=p; return p;
+    })();
+    return this._loading;
+  }
+};
+async function runPython(code, outEl, statusEl){
+  let p;
+  try{ p = await Py.get(m=>{ if(statusEl) statusEl.textContent=m; }); }
+  catch(e){ outEl.textContent="Couldn't load Python runtime (need internet). "+ (e.message||""); if(statusEl) statusEl.textContent="Error"; return; }
+  try{
+    if(/\b(from|import)\s+(scipy|sklearn|statsmodels|matplotlib)\b/.test(code)){
+      if(statusEl) statusEl.textContent="Loading libraries used by this code…";
+      await p.loadPackagesFromImports(code);
+    }
+  }catch(_){}
+  if(statusEl) statusEl.textContent="Running…";
+  try{
+    p.globals.set("_src", code);
+    const out = await p.runPythonAsync(`
+import sys, io
+_b = io.StringIO(); _o = sys.stdout; sys.stdout = _b
+try:
+    exec(_src, globals())
+except Exception:
+    import traceback; traceback.print_exc()
+finally:
+    sys.stdout = _o
+_b.getvalue()`);
+    outEl.textContent = (out && String(out).trim()) ? out : "(ran successfully — no printed output; add print(...) to see values)";
+    if(statusEl) statusEl.textContent="Done ✓";
+  }catch(e){ outEl.textContent=String(e.message||e); if(statusEl) statusEl.textContent="Error"; }
+}
+function autoGrow(ta){ ta.style.height="auto"; ta.style.height=Math.min(ta.scrollHeight+4,460)+"px"; }
+function wireRunBlocks(root){
+  root.querySelectorAll(".pyblock").forEach(el=>{
+    if(el.dataset.wired) return; el.dataset.wired="1";
+    let code=""; try{ code=decodeURIComponent(escape(atob(el.dataset.code||""))); }catch(_){ code=""; }
+    const title=el.dataset.title||"Try it — runs in your browser";
+    el.innerHTML=`
+      <div class="py-h"><span>${I.git} ${esc(title)}</span><span class="py-status muted"></span></div>
+      <textarea class="py-code" spellcheck="false"></textarea>
+      <div class="py-actions"><button class="btn btn--primary btn--sm py-run">${I.play} Run</button>
+        <button class="btn btn--ghost btn--sm py-reset">Reset</button></div>
+      <pre class="py-out" hidden></pre>`;
+    const ta=el.querySelector(".py-code"); ta.value=code; autoGrow(ta);
+    const out=el.querySelector(".py-out"); const status=el.querySelector(".py-status");
+    el.querySelector(".py-run").addEventListener("click",async()=>{ out.hidden=false; out.textContent="…"; await runPython(ta.value,out,status); });
+    el.querySelector(".py-reset").addEventListener("click",()=>{ ta.value=code; autoGrow(ta); out.hidden=true; status.textContent=""; });
+    ta.addEventListener("input",()=>autoGrow(ta));
+  });
+}
+
 function linkify(s){ return esc(s).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>'); }
 function renderRich(txt){
   const lines=String(txt||"").split("\n");
@@ -894,6 +1034,30 @@ function renderRich(txt){
       const parts=rest.split("|"); if(parts.length>1){ title=parts.slice(1).join("|").trim(); rest=parts[0].trim(); }
       const idm=rest.match(/[A-Za-z0-9_-]{11}/); const id=idm?idm[0]:"";
       if(id) html+=`<div class="rt-vid"><div class="rt-vid__f"><iframe src="https://www.youtube-nocookie.com/embed/${id}" title="${esc(title||'Video')}" allow="accelerometer;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen loading="lazy"></iframe></div>${title?`<div class="rt-vid__t">▶ ${esc(title)}</div>`:""}</div>`;
+      continue;
+    }
+    if(/^@svg\s+/i.test(t)){
+      flush();
+      const key=t.replace(/^@svg\s+/i,"").trim().toLowerCase();
+      html+=`<div class="rt-svg">${SVGS[key]||`<p class="rt-p muted">[diagram: ${esc(key)}]</p>`}</div>`;
+      continue;
+    }
+    if(/^@run\b/i.test(t)){
+      flush();
+      const title=t.replace(/^@run\b/i,"").trim();
+      const buf=[];
+      let j=i+1;
+      for(; j<lines.length; j++){
+        const nx=lines[j];
+        if(/^(\s{4,}|\t)/.test(nx)){ buf.push(nx.replace(/^(\s{4}|\t)/,"")); }
+        else if(nx.trim()===""){ buf.push(""); }
+        else break;
+      }
+      while(buf.length && buf[buf.length-1]==="") buf.pop();
+      i=j-1;
+      const src=buf.join("\n");
+      let b64=""; try{ b64=btoa(unescape(encodeURIComponent(src))); }catch(_){ b64=""; }
+      html+=`<div class="pyblock" data-code="${b64}" data-title="${esc(title||'Try it — runs in your browser')}"></div>`;
       continue;
     }
     if(isDiv(ln)){ flush();
@@ -1111,6 +1275,103 @@ async function viewNote(mount,r){
     </div>`;
   $("[data-back]").addEventListener("click",()=>location.hash=backHash);
   $("[data-edit]")?.addEventListener("click",()=>editNote(n,n.course_id));
+  wireRunBlocks(mount);
+}
+
+/* =============================================================== PYTHON PLAYGROUND */
+const PLAY_SNIPPETS = [
+  {name:"Descriptive stats", code:
+`import numpy as np, pandas as pd
+
+# Monthly salaries (in thousands) of a small team
+salary = pd.Series([32, 35, 38, 40, 41, 42, 45, 250])  # last one is the CEO (outlier)
+
+print("Mean   :", round(salary.mean(), 2))
+print("Median :", salary.median())
+print("Mode   :", salary.mode().tolist())
+print("Std dev:", round(salary.std(), 2))
+print("Variance:", round(salary.var(), 2))
+print("Skewness:", round(salary.skew(), 2))
+print("Kurtosis:", round(salary.kurtosis(), 2))
+print()
+print("Notice: the CEO's 250 drags the MEAN up to", round(salary.mean(),1),
+      "but the MEDIAN stays at", salary.median(), "- median resists outliers.")`},
+  {name:"Two-sample t-test", code:
+`import numpy as np
+from scipy import stats
+
+# Test scores of two teaching methods
+method_A = np.array([72, 75, 78, 71, 69, 80, 74, 77])
+method_B = np.array([80, 83, 79, 85, 82, 88, 81, 84])
+
+t, p = stats.ttest_ind(method_A, method_B)
+print("t-statistic:", round(t, 3))
+print("p-value    :", round(p, 5))
+print("Method A mean:", method_A.mean(), " Method B mean:", method_B.mean())
+if p < 0.05:
+    print("=> p < 0.05: reject H0. The difference is statistically significant.")
+else:
+    print("=> p >= 0.05: not enough evidence of a real difference.")`},
+  {name:"Confusion matrix metrics", code:
+`# Disease screening on 1000 patients
+TP, FN = 90, 10     # sick patients: caught vs missed
+FP, TN = 80, 820    # healthy patients: false alarm vs correct
+
+accuracy    = (TP + TN) / (TP + TN + FP + FN)
+precision   = TP / (TP + FP)
+recall      = TP / (TP + FN)          # = sensitivity
+specificity = TN / (TN + FP)
+f1          = 2 * precision * recall / (precision + recall)
+
+print(f"Accuracy    : {accuracy:.2f}")
+print(f"Precision   : {precision:.2f}   (of those flagged sick, how many really are)")
+print(f"Recall/Sens : {recall:.2f}   (of the truly sick, how many we caught)")
+print(f"Specificity : {specificity:.2f}   (of the healthy, how many we cleared)")
+print(f"F1 score    : {f1:.2f}")`},
+  {name:"Chi-square test", code:
+`import numpy as np
+from scipy import stats
+
+# Is buying related to gender? (contingency table)
+#            Bought  Didn't
+#   Male       30      70
+#   Female     45      55
+table = np.array([[30, 70],
+                  [45, 55]])
+
+chi2, p, dof, expected = stats.chi2_contingency(table)
+print("Chi-square:", round(chi2, 3))
+print("p-value   :", round(p, 4))
+print("Expected counts under independence:")
+print(np.round(expected, 1))
+print("Significant association?", "YES" if p < 0.05 else "NO")`},
+  {name:"Blank", code:"# Write any Python here (numpy, pandas, scipy available)\n"},
+];
+async function viewPlayground(mount){
+  mount.innerHTML=`
+    <div class="page-h"><div><h1>Python playground</h1>
+      <p>Real Python running in your browser — numpy, pandas and scipy included. Pick an example or write your own, then Run. Nothing is sent to a server; the first run downloads the runtime (~10&nbsp;MB), so give it a few seconds.</p></div></div>
+    <div class="card card--pad">
+      <div class="between" style="flex-wrap:wrap;gap:.5rem;margin-bottom:.8rem">
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap" id="snips">
+          ${PLAY_SNIPPETS.map((s,i)=>`<button class="btn btn--ghost btn--sm" data-snip="${i}">${esc(s.name)}</button>`).join("")}
+        </div>
+        <span class="py-status muted" id="pstatus"></span>
+      </div>
+      <textarea class="py-code" id="pcode" spellcheck="false"></textarea>
+      <div class="py-actions">
+        <button class="btn btn--primary btn--sm" id="prun">${I.play} Run</button>
+        <button class="btn btn--ghost btn--sm" id="pclear">Clear output</button>
+      </div>
+      <pre class="py-out" id="pout" hidden></pre>
+    </div>`;
+  const ta=$("#pcode"), out=$("#pout"), status=$("#pstatus");
+  const load=(i)=>{ ta.value=PLAY_SNIPPETS[i].code; autoGrow(ta); out.hidden=true; status.textContent=""; };
+  load(0);
+  mount.querySelectorAll("[data-snip]").forEach(b=>b.addEventListener("click",()=>load(+b.dataset.snip)));
+  ta.addEventListener("input",()=>autoGrow(ta));
+  $("#prun").addEventListener("click",async()=>{ out.hidden=false; out.textContent="…"; await runPython(ta.value,out,status); });
+  $("#pclear").addEventListener("click",()=>{ out.hidden=true; out.textContent=""; status.textContent=""; });
 }
 
 /* =============================================================== ASSIGNMENTS */
