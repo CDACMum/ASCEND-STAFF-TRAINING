@@ -1,7 +1,7 @@
-﻿// =====================================================================
-//  ASCEND 2026 â€” connection settings  (LIVE)
+// =====================================================================
+//  ASCEND 2026 — connection settings  (LIVE)
 //  Connected to the C-DAC Mumbai Supabase project.
-//  Only the public URL + publishable key live here â€” both are safe to ship
+//  Only the public URL + publishable key live here — both are safe to ship
 //  to the browser. The database password is NEVER stored in the app.
 // =====================================================================
 window.ASCEND_CONFIG = {
@@ -17,6 +17,3 @@ window.ASCEND_CONFIG = {
 window.ASCEND_DEMO =
   !window.ASCEND_CONFIG.SUPABASE_URL ||
   window.ASCEND_CONFIG.SUPABASE_URL.startsWith("YOUR_");
-
-window.ASCEND_DEMO = true;
-
