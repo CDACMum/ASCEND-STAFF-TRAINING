@@ -856,6 +856,7 @@ async function dashAdmin(mount){
       <button class="btn btn--ghost" data-qa>${I.plus} New assignment</button>
       <button class="btn btn--ghost" data-qq>${I.plus} New quiz</button>
       <button class="btn btn--ghost" data-qcap>${I.plus} New capstone</button>
+      <button class="btn btn--ghost" data-qrec>${I.play} Add recording</button>
       <a class="btn btn--ghost" href="#/review">${I.inbox} Review work</a>
       <a class="btn btn--ghost" href="#/admin">${I.users} Manage people</a>
     </div>
@@ -868,6 +869,7 @@ async function dashAdmin(mount){
   $("[data-qa]").addEventListener("click",()=>editAssignment(null));
   $("[data-qq]").addEventListener("click",()=>editQuiz(null));
   $("[data-qcap]").addEventListener("click",()=>editCapstone(null));
+  $("[data-qrec]").addEventListener("click",()=>addRecording());
 }
 
 function assignmentRow(a,courses){
@@ -1378,30 +1380,183 @@ async function viewPlayground(mount){
 async function viewAssignments(mount){
   const [assignments,courses]=await Promise.all([db.assignments(),db.courses()]);
   const mine=Auth.canManage?[]:await db.mySubmissions(Auth.user.id).catch(()=>[]);
+  const all=Auth.canManage?await db.allSubmissions().catch(()=>[]):[];
   const byId=Object.fromEntries(mine.map(s=>[s.assignment_id,s]));
-  mount.innerHTML=`
-    <div class="page-h"><div><h1>Assignments</h1><p>Submit your work as a Git link, Google Drive link and/or recording.</p></div>
-      ${Auth.canManage?`<button class="btn btn--primary" data-add>${I.plus} New assignment</button>`:""}</div>
-    <div class="stack">${assignments.map(a=>{
-      const c=courses.find(x=>x.id===a.course_id); const sub=byId[a.id];
-      const overdue=!sub && isPast(a.due_at);
-      return `<div class="assign" data-open="${a.id}" style="cursor:pointer">
-        <div class="assign__top">
-          <div><h3>${esc(a.title)}</h3><div class="course-tag">${c?esc(c.title):"General"}</div></div>
-          <div>${Auth.canManage?(a.is_open?`<span class="badge open">Open</span>`:`<span class="badge closed">Closed</span>`):statusBadge(sub)}</div>
+  const list=[...assignments].sort((x,y)=>new Date(y.due_at)-new Date(x.due_at));   // newest first
+
+  // First paragraph of the brief, as plain text, for the card summary.
+  const intro=(b)=>{ const out=[]; for(const ln of String(b||"").replace(/\r/g,"").split("\n")){ const t=ln.trim();
+      if(/^[─━═\-_=]{4,}$/.test(t)) break; if(!t){ if(out.length) break; continue; } if(/^DUE:/i.test(t)) continue; out.push(t); }
+    const s=out.join(" "); return s.length>230?s.slice(0,227).replace(/\s+\S*$/,"")+"…":s; };
+  const qCount=(b)=>briefModel(b).reduce((n,s)=>n+s.q,0);
+  const tag=(a,i)=>{ const m=String(a.title||"").match(/assignment\s*(\d+)/i); return m?`A${m[1]}`:`#${list.length-i}`; };
+
+  let summary="";
+  if(!Auth.canManage && list.length){
+    const done=mine.filter(s=>byId[s.assignment_id]===s && list.some(a=>a.id===s.assignment_id));
+    const graded=done.filter(s=>s.grade!=null);
+    const pct=graded.length?Math.round(graded.reduce((n,s)=>{const a=list.find(x=>x.id===s.assignment_id);return n+s.grade/(Number(a?.points)||100)*100;},0)/graded.length):null;
+    const todo=list.filter(a=>!byId[a.id] && a.is_open).length;
+    summary=`<div class="al-sum">
+      <div><b>${done.length}<span>/ ${list.length}</span></b><small>Submitted</small></div>
+      <div><b>${todo}</b><small>Still to do</small></div>
+      <div><b>${done.filter(s=>s.status==="submitted").length}</b><small>Awaiting review</small></div>
+      <div><b>${pct!=null?pct+"%":"—"}</b><small>Average score</small></div></div>`;
+  } else if(Auth.canManage && list.length){
+    const pend=all.filter(s=>s.status==="submitted").length;
+    summary=`<div class="al-sum">
+      <div><b>${list.length}</b><small>Assignments</small></div>
+      <div><b>${list.filter(a=>a.is_open).length}</b><small>Open</small></div>
+      <div><b>${all.length}</b><small>Submissions</small></div>
+      <div><b>${pend}</b><small>Awaiting review</small></div></div>`;
+  }
+
+  const card=(a,i)=>{
+    const c=courses.find(x=>x.id===a.course_id); const sub=byId[a.id];
+    const late=isPast(a.due_at); const q=qCount(a.brief);
+    const subsA=all.filter(s=>s.assignment_id===a.id), pendA=subsA.filter(s=>s.status==="submitted").length;
+    let right, cta;
+    if(Auth.canManage){
+      right=`<div class="al-count"><b>${subsA.length}</b><small>submitted</small>${pendA?`<span class="badge submitted">${pendA} to review</span>`:subsA.length?`<span class="badge reviewed">All reviewed</span>`:""}</div>`;
+      cta=pendA?"Review submissions":"Open";
+    } else if(sub && sub.grade!=null){
+      const pct=Math.max(0,Math.min(100,Math.round(sub.grade/(Number(a.points)||100)*100))); const [band,cls]=gradeBand(pct);
+      right=`<div class="al-ring ${cls}" style="--p:${pct}"><div><b>${sub.grade}</b><small>/ ${a.points}</small></div></div><div class="al-band ${cls}">${band}</div>`;
+      cta=sub.status==="returned"?"See feedback & resubmit":"See review";
+    } else {
+      right=`<div class="al-state">${stuBadge(sub)}</div>`;
+      cta=sub?"View submission":(a.is_open?"Start & submit":"View brief");
+    }
+    const dueCls=Auth.canManage?"":(sub?"":late?"is-late":(new Date(a.due_at)-Date.now()<3*864e5?"is-soon":""));
+    return `<article class="al-card ${!Auth.canManage&&!sub&&a.is_open?"is-todo":""} ${sub?.status==="returned"?"is-returned":""}" data-open="${a.id}" tabindex="0" role="link">
+      <div class="al-tag">${tag(a,i)}</div>
+      <div class="al-main">
+        <div class="al-course">${c?esc(c.title):"General"}${a.is_open?"":` · <span class="al-closed">Closed</span>`}</div>
+        <h3>${esc(a.title.replace(/^assignment\s*\d+\s*[—–:-]\s*/i,""))}</h3>
+        <p>${esc(intro(a.brief))}</p>
+        <div class="al-meta">
+          <span class="${dueCls}">${I.clock} Due ${fmtDT(a.due_at)}${!Auth.canManage&&!sub?` · ${relDue(a.due_at)}`:""}</span>
+          <span>${a.points} points</span>
+          ${q?`<span>${q} questions</span>`:""}
+          ${sub?`<span>Submitted ${fmtDate(sub.submitted_at)}</span>`:""}
         </div>
-        <p class="brief">${esc((a.brief||"").slice(0,160))}${(a.brief||"").length>160?"…":""}</p>
-        <div class="assign__foot">
-          <div class="meta">
-            <span>Due <b>${fmtDate(a.due_at)}</b></span>
-            <span>${a.points} points</span>
-            ${overdue&&!Auth.canManage?`<span class="badge due">Overdue</span>`:(a.is_open?`<span class="badge open">Open</span>`:`<span class="badge closed">Closed</span>`)}
-          </div>
-          <span class="btn btn--ghost btn--sm">${Auth.canManage?"Open":(sub?"View / update":"Submit work")} ${I.chev}</span>
-        </div></div>`;
-    }).join("")||emptyBlock("No assignments yet","They'll appear here once published.",I.clip)}</div>`;
-  mount.querySelectorAll("[data-open]").forEach(el=>el.addEventListener("click",()=>location.hash=`#/assignment/${el.dataset.open}`));
+      </div>
+      <div class="al-side">${right}<span class="btn ${!Auth.canManage&&!sub&&a.is_open?"btn--primary":"btn--ghost"} btn--sm">${cta} ${I.chev}</span></div>
+    </article>`;
+  };
+
+  mount.innerHTML=`
+    <div class="page-h"><div><h1>Assignments</h1><p>${Auth.canManage?"Briefs, submissions and reviews for every assignment.":"Read the brief, submit your links, and see your grade and trainer feedback here."}</p></div>
+      ${Auth.canManage?`<button class="btn btn--primary" data-add>${I.plus} New assignment</button>`:""}</div>
+    ${summary}
+    <div class="al-list">${list.map(card).join("")||emptyBlock("No assignments yet","They'll appear here once published.",I.clip)}</div>`;
+  mount.querySelectorAll("[data-open]").forEach(el=>{
+    const go=()=>location.hash=`#/assignment/${el.dataset.open}`;
+    el.addEventListener("click",go);
+    el.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
+  });
   $("[data-add]")?.addEventListener("click",()=>editAssignment(null));
+}
+
+/* ---- Assignment page helpers: brief renderer, participant status & review ---- */
+function niceTitle(t){
+  t=String(t||"").trim();
+  const sentence=(w)=>w.toLowerCase().replace(/[a-z]/,ch=>ch.toUpperCase()).replace(/\b(part|module|level) ([a-z])\b/gi,(m,x,c)=>x+" "+c.toUpperCase());
+  if(!/[a-z]/.test(t)) return sentence(t);
+  // "🏬 BUSINESS PROBLEM 1 — Meridian" / "MARKING (100 points)": soften the shouty prefix only
+  return t.replace(/^([^A-Za-z0-9]*)([A-Z][A-Z0-9]*(?: [A-Z0-9]+)*)(?=\s*(?:[—–(-]|$))/,(m,pre,cap)=>/[A-Z]{3,}/.test(cap)?pre+sentence(cap):m);
+}
+function relDue(d){
+  const ms=new Date(d)-Date.now(), n=Math.round(Math.abs(ms)/864e5);
+  if(ms>0) return n<1?"due today":`${n} day${n>1?"s":""} left`;
+  return n<1?"due date passed today":`due date passed ${n} day${n>1?"s":""} ago`;
+}
+function stuLabel(s){ if(!s) return "Not submitted"; return {submitted:"Awaiting review",reviewed:"Reviewed",returned:"Returned for changes"}[s.status]||s.status; }
+function stuBadge(s){
+  if(!s) return `<span class="badge closed">Not submitted</span>`;
+  const cls={submitted:"submitted",reviewed:"reviewed",returned:"due"}[s.status]||"submitted";
+  return `<span class="badge ${cls}">${stuLabel(s)}</span>`;
+}
+const gradeBand=(pct)=>pct>=85?["Excellent","g-ex"]:pct>=70?["Good","g-good"]:pct>=50?["Satisfactory","g-ok"]:["Needs work","g-low"];
+
+// Splits an assignment brief into titled sections. Understands divider-framed headings,
+// "── Part A — … (n questions) ──" part bars, "Group (Q1–8)" labels, numbered questions,
+// "• key — description" bullets and indented code.
+function briefModel(txt){
+  const lines=String(txt||"").replace(/\r/g,"").split("\n");
+  const isDiv=(s)=>/^[─━═\-_=]{4,}$/.test((s||"").trim());
+  const secs=[{title:"",html:"",n:0}]; let cur=secs[0]; let code=[]; let list=false;
+  const flush=()=>{ if(code.length){ cur.html+=`<pre class="rt-code">${esc(code.join("\n"))}</pre>`; code=[]; } };
+  const closeList=()=>{ if(list){ cur.html+="</ul>"; list=false; } };
+  for(let i=0;i<lines.length;i++){
+    const ln=lines[i], t=ln.trim();
+    if(/^DUE:/i.test(t)) continue;                       // shown in the page header instead
+    if(isDiv(t)){
+      flush(); closeList();
+      const h=lines[i+1];
+      if(h!==undefined && h.trim() && !isDiv(h)){ cur={title:h.trim(),html:"",n:0}; secs.push(cur); i++; if(isDiv(lines[i+1])) i++; }
+      continue;
+    }
+    const part=t.match(/^[─━═=\-]{2,}\s+(.+?)\s+[─━═=\-]{2,}$/);
+    if(part){
+      flush(); closeList();
+      const pm=part[1].match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+      cur.html+=`<div class="ab-part"><span>${esc(pm?pm[1]:part[1])}</span>${pm?`<em>${esc(pm[2])}</em>`:""}</div>`;
+      continue;
+    }
+    if(/^(\s{4,}|\t)\S/.test(ln)){ closeList(); code.push(ln.replace(/^(\s{4}|\t)/,"")); continue; }
+    flush();
+    if(!t){ closeList(); continue; }
+    const q=t.match(/^(\d{1,3})[.)]\s+(.+)$/);
+    if(q){ closeList(); cur.n++; cur.html+=`<div class="ab-q"><span class="ab-qn">${q[1]}</span><div class="ab-qt">${linkify(q[2])}</div></div>`; continue; }
+    const grp=t.match(/^([A-Z][^.:]{1,60}?)\s*\((Q\d+\s*[–-]\s*Q?\d+)\)\s*:?$/);
+    if(grp){ closeList(); cur.html+=`<div class="ab-grp">${esc(grp[1])}<span>${esc(grp[2])}</span></div>`; continue; }
+    if(/^[A-Z]{4,}\b/.test(t) && t.length<60 && !/[.?]$/.test(t)){ closeList(); cur.html+=`<div class="ab-grp">${esc(niceTitle(t))}</div>`; continue; }
+    if(/^[•\-]\s/.test(t)){
+      if(!list){ cur.html+=`<ul class="ab-ul">`; list=true; }
+      const body=t.replace(/^[•\-]\s+/,"");
+      const k=body.match(/^(.{1,42}?)(\s+)[—–]\s+(.+)$/);
+      if(k&&k[2].length>1) k[1]+=k[2].slice(1);          // keep meaningful trailing spaces ("Client Name ")
+      const mono=k&&(/[_.]/.test(k[1])||/^[a-z]/.test(k[1])||/\s$/.test(k[1]));
+      cur.html+=`<li>${k?`<b class="${mono?"is-mono":""}">${esc(k[1])}</b> — ${linkify(k[3])}`:linkify(body)}</li>`;
+      continue;
+    }
+    closeList();
+    cur.html+=`<p>${linkify(t)}</p>`;
+  }
+  flush(); closeList();
+  // A section is a question paper only if it holds a real run of numbered items (not a 3-step "how to work").
+  for(const s of secs) s.q=s.n>=8?s.n:0;
+  return secs.filter(s=>s.title||s.html.trim());
+}
+
+function subSteps(sub){
+  const st=sub?.status;
+  const steps=[
+    {l:"Submitted", s:sub?"done":"cur", d:sub?fmtDT(sub.submitted_at):"Not yet"},
+    {l:"Trainer review", s:!sub?"todo":st==="submitted"?"cur":"done", d:!sub?"":st==="submitted"?"In the review queue":"Done"},
+    {l:st==="returned"?"Returned for changes":"Graded", s:st==="reviewed"?"done":st==="returned"?"warn":"todo",
+     d:(st==="reviewed"||st==="returned")&&sub.reviewed_at?fmtDT(sub.reviewed_at):""}
+  ];
+  return `<ol class="ab-steps">${steps.map(x=>`<li class="is-${x.s}"><span class="ab-dot">${x.s==="done"?I.check:x.s==="warn"?"!":""}</span><div><b>${x.l}</b>${x.d?`<small>${esc(x.d)}</small>`:""}</div></li>`).join("")}</ol>`;
+}
+
+function reviewCard(sub,points){
+  if(!sub) return "";
+  const fb=(sub.feedback||"").trim();
+  if(sub.grade==null && !fb) return "";
+  const stale=sub.status==="submitted";               // resubmitted after an earlier review
+  const pts=Number(points)||100;
+  const pct=sub.grade!=null?Math.max(0,Math.min(100,Math.round(sub.grade/pts*100))):null;
+  const [band,cls]=pct!=null?gradeBand(pct):["",""];
+  return `<div class="card ab-review ${sub.status==="returned"?"is-returned":""}">
+    <div class="ab-review__h"><span>${stale?"Previous review":"Trainer review"}</span>${sub.reviewed_at?`<small>${fmtDT(sub.reviewed_at)}</small>`:""}</div>
+    ${sub.status==="returned"?`<div class="ab-alert">Returned for changes. Read the feedback, update your work and resubmit.</div>`:""}
+    ${stale?`<div class="ab-note">You updated your submission after this review, so it is back in the review queue.</div>`:""}
+    ${pct!=null?`<div class="ab-score ${cls}"><div class="ab-score__n"><b>${sub.grade}</b><span>/ ${pts}</span></div>
+      <div class="ab-score__band">${band} · ${pct}%</div><div class="ab-bar"><i style="width:${pct}%"></i></div></div>`:""}
+    ${fb?`<div class="ab-fb"><div class="ab-fb__l">Feedback</div><div class="ab-fb__t">${linkify(fb).replace(/\n/g,"<br>")}</div></div>`:""}
+  </div>`;
 }
 
 async function viewAssignment(mount,r){
@@ -1411,66 +1566,106 @@ async function viewAssignment(mount,r){
   const c=courses.find(x=>x.id===a.course_id);
   const sub=Auth.canManage?null:await db.mySubmission(a.id,Auth.user.id).catch(()=>null);
   const overdue=isPast(a.due_at);
+  const closed=!a.is_open;
+  const secs=briefModel(a.brief);
+  const qTotal=secs.reduce((n,s)=>n+s.q,0);
+  const titled=secs.map((s,i)=>({s,i})).filter(x=>x.s.title);
 
-  const managerBlock = Auth.canManage ? `
-    <div class="section-h"><h2>Submissions</h2></div>
+  const hero=`<div class="ab-hero">
+    <div class="ab-hero__k">${c?esc(c.title):"General"} · Assignment</div>
+    <h1>${esc(a.title)}</h1>
+    <div class="ab-facts">
+      <div><small>Due</small><b>${fmtDT(a.due_at)}</b><span class="${overdue?"is-late":""}">${relDue(a.due_at)}</span></div>
+      <div><small>Points</small><b>${a.points}</b><span>${qTotal?`${qTotal} questions`:"in total"}</span></div>
+      <div><small>${Auth.canManage?"Submissions":"Your status"}</small><b>${Auth.canManage?(closed?"Closed":"Open"):esc(stuLabel(sub))}</b>
+        <span>${Auth.canManage?(closed?"not accepting work":"accepting work"):(sub?`submitted ${fmtDate(sub.submitted_at)}`:(closed?"submissions closed":"nothing submitted yet"))}</span></div>
+    </div></div>`;
+
+  const brief=`<div class="ab-brief">
+    ${titled.length>1?`<nav class="ab-toc" aria-label="Sections">${titled.map(x=>`<button type="button" data-jump="${x.i}">${esc(niceTitle(x.s.title))}</button>`).join("")}</nav>`:""}
+    ${secs.map((s,i)=>`<section class="card ab-sec" id="ab-sec-${i}">
+      ${s.title?`<h2 class="ab-h"><span>${esc(niceTitle(s.title))}</span>${s.q?`<span class="ab-count">${s.q} questions</span>`:""}</h2>`:""}
+      <div class="ab-body">${s.html}</div></section>`).join("")}
+  </div>`;
+
+  const showForm=!sub && !closed;
+  const side=Auth.canManage?"":`<aside class="ab-side">
+    ${reviewCard(sub,a.points)}
+    <div class="card ab-panel">
+      <div class="ab-panel__h">Your submission</div>
+      ${subSteps(sub)}
+      ${sub?`<div class="ab-mine"><div class="ab-mine__l">Submitted links</div>${linkChips(sub)}
+        ${sub.notes?`<p class="ab-mine__n">Your note: ${esc(sub.notes)}</p>`:""}
+        ${closed?"":`<button type="button" class="btn btn--ghost btn--sm" data-editsub>${I.edit} ${sub.status==="returned"?"Resubmit":"Update submission"}</button>`}</div>`:""}
+      ${closed&&!sub?`<div class="ab-note">This assignment is closed for submissions.</div>`:""}
+      <form data-sform class="ab-form" ${showForm?"":"hidden"}>
+        <div class="field"><label>Git repository link <span class="hint">GitHub / GitLab URL</span></label>
+          <input class="input" name="git" type="url" placeholder="https://github.com/you/ascend-you" value="${esc(sub?.git_url||"")}"/></div>
+        <div class="field"><label>Google Drive link <span class="hint">notebook, docs, files</span></label>
+          <input class="input" name="drive" type="url" placeholder="https://drive.google.com/…" value="${esc(sub?.drive_url||"")}"/></div>
+        <div class="field"><label>Recording link <span class="hint">optional</span></label>
+          <input class="input" name="rec" type="url" placeholder="https://…" value="${esc(sub?.recording_url||"")}"/></div>
+        <div class="field"><label>Note for the reviewer <span class="hint">optional</span></label>
+          <textarea name="notes" placeholder="Anything the reviewer should know…">${esc(sub?.notes||"")}</textarea></div>
+        <button class="btn btn--primary" data-submit>${sub?"Save and resubmit":"Submit work"}</button>
+        ${sub&&sub.status!=="submitted"?`<p class="ab-hint">Resubmitting sends your work back to the review queue.</p>`:""}
+        ${overdue&&!sub?`<p class="ab-hint">The due date has passed. Late work is still accepted while the assignment is open.</p>`:""}
+      </form>
+    </div>
+  </aside>`;
+
+  const managerBlock=Auth.canManage?`
+    <div class="section-h" style="margin-top:1.4rem"><h2>Submissions</h2></div>
     <div id="asubs"><div class="spinner"></div></div>
     <div class="between" style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--line)">
       <span class="muted" style="font-size:.85rem">Manage</span>
       <div style="display:flex;gap:.5rem">
         <button class="btn btn--ghost btn--sm" data-edit-a>${I.edit} Edit assignment</button>
-        <button class="btn btn--danger btn--sm" data-del-a>${I.trash} Delete</button></div></div>` : `
-    <div class="section-h"><h2>Your submission</h2></div>
-    <div class="card card--pad">
-      ${sub?`<div class="between" style="margin-bottom:1rem">
-        <div>${statusBadge(sub)}<div class="muted" style="font-size:.85rem;margin-top:.35rem">Submitted ${fmtDT(sub.submitted_at)}</div></div>
-        ${linkChips(sub)}</div>
-        ${sub.feedback?`<div class="card--pad" style="background:var(--paper-2);border-radius:12px;margin-bottom:1rem">
-          <b style="font-size:.85rem">Feedback from reviewer</b><p class="muted" style="margin:.3rem 0 0;white-space:pre-wrap">${esc(sub.feedback)}</p></div>`:""}`:""}
-      <form data-sform>
-        <div class="field"><label>Git repository link <span class="hint">GitHub / GitLab URL</span></label>
-          <input class="input" name="git" type="url" placeholder="https://github.com/you/ascend-you" value="${esc(sub?.git_url||"")}"/></div>
-        <div class="field"><label>Google Drive link <span class="hint">optional — docs, slides, files</span></label>
-          <input class="input" name="drive" type="url" placeholder="https://drive.google.com/…" value="${esc(sub?.drive_url||"")}"/></div>
-        <div class="field"><label>Recording link <span class="hint">optional — Zoom / YouTube / Drive video</span></label>
-          <input class="input" name="rec" type="url" placeholder="https://…" value="${esc(sub?.recording_url||"")}"/></div>
-        <div class="field"><label>Notes for reviewer <span class="hint">optional</span></label>
-          <textarea name="notes" placeholder="Anything the reviewer should know…">${esc(sub?.notes||"")}</textarea></div>
-        <button class="btn btn--primary" data-submit>${sub?"Update submission":"Submit work"}</button>
-      </form>
-    </div>`;
+        <button class="btn btn--danger btn--sm" data-del-a>${I.trash} Delete</button></div></div>`:"";
 
   mount.innerHTML=`
     <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All assignments</button>
-    <div class="card card--pad">
-      <div class="between"><div>
-        <div class="course-tag muted" style="font-size:.85rem">${c?esc(c.title):"General"}</div>
-        <h1 style="font-family:var(--font-d);font-size:1.6rem;letter-spacing:-.02em;margin:.2rem 0 0">${esc(a.title)}</h1>
-      </div><div style="text-align:right">
-        <div class="badge ${overdue&&!sub?"due":"open"}">Due ${fmtDate(a.due_at)}</div>
-        <div class="muted" style="font-size:.85rem;margin-top:.3rem">${a.points} points</div>
-      </div></div>
-      <p style="white-space:pre-wrap;color:var(--muted);margin:1rem 0 0">${esc(a.brief||"")}</p>
-    </div>
+    ${hero}
+    <div class="ab-layout ${Auth.canManage?"is-wide":""}">${brief}${side}</div>
     ${managerBlock}`;
 
   $("[data-back]").addEventListener("click",()=>location.hash="#/assignments");
+  mount.querySelectorAll("[data-jump]").forEach(b=>b.addEventListener("click",()=>{
+    document.getElementById(`ab-sec-${b.dataset.jump}`)?.scrollIntoView({behavior:"smooth",block:"start"});
+  }));
+
   if(Auth.canManage){
     $("[data-edit-a]").addEventListener("click",()=>editAssignment(a));
     $("[data-del-a]").addEventListener("click",()=>confirmModal("Delete this assignment and its submissions?",async()=>{await db.remove("assignments",a.id);toast("Assignment deleted");location.hash="#/assignments";}));
     const [subs,people]=await Promise.all([db.submissionsFor(a.id),db.people().catch(()=>[])]);
     const pmap=Object.fromEntries(people.map(p=>[p.id,p]));
-    $("#asubs").innerHTML = subs.length?`<div class="tablewrap"><table>
-      <thead><tr><th>Member</th><th>Links</th><th>Submitted</th><th>Status</th><th>Grade</th><th></th></tr></thead>
+    const pending=subs.filter(s=>s.status==="submitted").length;
+    const graded=subs.filter(s=>s.grade!=null);
+    const avg=graded.length?Math.round(graded.reduce((n,s)=>n+Number(s.grade),0)/graded.length):null;
+    const order={submitted:0,returned:1,reviewed:2};
+    subs.sort((x,y)=>(order[x.status]??0)-(order[y.status]??0)||new Date(x.submitted_at)-new Date(y.submitted_at));
+    $("#asubs").innerHTML=subs.length?`
+      <div class="ab-stats">
+        <div><b>${subs.length}</b><span>Submitted</span></div>
+        <div><b>${pending}</b><span>Awaiting review</span></div>
+        <div><b>${subs.length-pending}</b><span>Reviewed or returned</span></div>
+        <div><b>${avg??"—"}</b><span>Average grade${avg!=null?` / ${a.points}`:""}</span></div>
+      </div>
+      <div class="tablewrap"><table>
+      <thead><tr><th>Member</th><th>Links</th><th>Submitted</th><th>Status</th><th>Grade</th><th>Feedback</th><th></th></tr></thead>
       <tbody>${subs.map(s=>{const p=pmap[s.user_id]||{};return `<tr>
         <td class="who">${esc(p.full_name||s.user_id)}</td>
         <td>${linkChips(s)}</td>
         <td>${fmtDate(s.submitted_at)}</td><td>${statusBadge({status:s.status})}</td>
-        <td>${s.grade!=null?`<b>${s.grade}</b>`:"—"}</td>
-        <td style="text-align:right"><button class="btn btn--ghost btn--sm" data-rev="${s.id}">Review</button></td></tr>`;}).join("")}</tbody>
+        <td>${s.grade!=null?`<b>${s.grade}</b><span class="muted"> / ${a.points}</span>`:"—"}</td>
+        <td><div class="fb-snip">${s.feedback?esc(s.feedback):"<span class='muted'>—</span>"}</div></td>
+        <td style="text-align:right"><button class="btn btn--ghost btn--sm" data-rev="${s.id}">${s.status==="submitted"?"Review":"Edit review"}</button></td></tr>`;}).join("")}</tbody>
     </table></div>`:emptyBlock("No submissions yet","No one has submitted this assignment.",I.inbox);
-    $("#asubs").querySelectorAll("[data-rev]").forEach(b=>b.addEventListener("click",()=>reviewSubmission(subs.find(s=>s.id===b.dataset.rev),pmap,()=>render())));
+    $("#asubs").querySelectorAll("[data-rev]").forEach(b=>b.addEventListener("click",()=>reviewSubmission(subs.find(s=>s.id===b.dataset.rev),pmap,()=>render(),a.points)));
   } else {
+    $("[data-editsub]")?.addEventListener("click",(e)=>{
+      const f=$("[data-sform]"); f.hidden=false; e.currentTarget.hidden=true; f.elements.git.focus();
+    });
     $("[data-submit]").addEventListener("click", async (e)=>{
       e.preventDefault();
       const f=$("[data-sform]");
@@ -1479,7 +1674,7 @@ async function viewAssignment(mount,r){
       for(const v of [git,drive,rec]){ if(v && !isURL(v)){ toast("One of the links isn't a valid URL","err"); return; } }
       const btn=$("[data-submit]"); btn.disabled=true; btn.textContent="Submitting…";
       try{ await db.submit({assignment_id:a.id,user_id:Auth.user.id,git_url:git,drive_url:drive,recording_url:rec,notes:f.elements.notes.value.trim()}); toast("Submission saved"); render(); }
-      catch(err){ toast(err.message||"Couldn't submit","err"); btn.disabled=false; btn.textContent=sub?"Update submission":"Submit work"; }
+      catch(err){ toast(err.message||"Couldn't submit","err"); btn.disabled=false; btn.textContent=sub?"Save and resubmit":"Submit work"; }
     });
   }
 }
@@ -1488,15 +1683,16 @@ async function viewMySubmissions(mount){
   const [subs,assignments]=await Promise.all([db.mySubmissions(Auth.user.id),db.assignments()]);
   const byId=Object.fromEntries(assignments.map(a=>[a.id,a]));
   mount.innerHTML=`
-    <div class="page-h"><div><h1>My submissions</h1><p>Every assignment you've turned in and its status.</p></div></div>
+    <div class="page-h"><div><h1>My submissions</h1><p>Every assignment you've turned in, its status, grade and trainer feedback.</p></div></div>
     ${subs.length?`<div class="tablewrap"><table>
-      <thead><tr><th>Assignment</th><th>Links</th><th>Submitted</th><th>Status</th><th>Grade</th></tr></thead>
+      <thead><tr><th>Assignment</th><th>Submitted</th><th>Status</th><th>Grade</th><th>Feedback</th><th></th></tr></thead>
       <tbody>${subs.map(s=>{const a=byId[s.assignment_id]||{};return `<tr data-open="${s.assignment_id}" style="cursor:pointer">
         <td class="who">${esc(a.title||"—")}</td>
-        <td>${linkChips(s)}</td>
         <td>${fmtDate(s.submitted_at)}</td>
-        <td>${statusBadge({status:s.status})}</td>
-        <td>${s.grade!=null?`<b>${s.grade}</b>`:"—"}</td></tr>`;}).join("")}</tbody>
+        <td>${stuBadge(s)}</td>
+        <td>${s.grade!=null?`<b>${s.grade}</b><span class="muted"> / ${a.points||100}</span>`:"—"}</td>
+        <td><div class="fb-snip">${s.feedback?esc(s.feedback):"<span class='muted'>Not reviewed yet</span>"}</div></td>
+        <td style="text-align:right"><span class="btn btn--ghost btn--sm">Open ${I.chev}</span></td></tr>`;}).join("")}</tbody>
     </table></div>`:emptyBlock("Nothing submitted yet","Head to Assignments to turn in your first piece of work.",I.inbox)}`;
   mount.querySelectorAll("[data-open]").forEach(el=>el.addEventListener("click",()=>location.hash=`#/assignment/${el.dataset.open}`));
 }
@@ -1762,30 +1958,39 @@ async function viewReview(mount){
         <td>${linkChips(s)}</td>
         <td>${fmtDate(s.submitted_at)}</td><td>${statusBadge({status:s.status})}</td>
         <td>${s.grade!=null?`<b>${s.grade}</b>`:"—"}</td>
-        <td style="text-align:right"><button class="btn btn--ghost btn--sm" data-rev="${s.id}">Review</button></td></tr>`;}).join("")}</tbody>
+        <td style="text-align:right"><button class="btn btn--ghost btn--sm" data-rev="${s.id}">${s.status==="submitted"?"Review":"Edit review"}</button></td></tr>`;}).join("")}</tbody>
     </table></div>`:emptyBlock("No submissions yet","No one has submitted this assignment.",I.inbox);
-    $("#revbody").querySelectorAll("[data-rev]").forEach(b=>b.addEventListener("click",()=>reviewSubmission(subs.find(s=>s.id===b.dataset.rev),pmap,load)));
+    $("#revbody").querySelectorAll("[data-rev]").forEach(b=>b.addEventListener("click",()=>reviewSubmission(subs.find(s=>s.id===b.dataset.rev),pmap,load,(assignments.find(x=>x.id===aid)||{}).points)));
   };
   pick?.addEventListener("change",load); await load();
 }
-function reviewSubmission(s,pmap,after){
+function reviewSubmission(s,pmap,after,points){
   const p=pmap[s.user_id]||{};
+  const pts=Number(points)||100;
   openModal({title:`Review — ${p.full_name||"Member"}`,wide:true,bodyHTML:`
+    <div class="muted" style="font-size:.85rem;margin-bottom:.6rem">Submitted ${fmtDT(s.submitted_at)}${s.reviewed_at?` · last reviewed ${fmtDT(s.reviewed_at)}`:""}</div>
     ${linkChips(s)}
-    ${s.notes?`<p class="muted" style="margin-top:.8rem"><b>Their notes:</b> ${esc(s.notes)}</p>`:""}
+    ${s.notes?`<div class="ab-fb" style="margin-top:.8rem"><div class="ab-fb__l">Participant's note</div><div class="ab-fb__t">${linkify(s.notes).replace(/\n/g,"<br>")}</div></div>`:""}
     <form data-rf style="margin-top:1rem">
       <div class="row2">
         <div class="field"><label>Status</label><select class="input" name="status">
-          ${["submitted","reviewed","returned"].map(o=>`<option value="${o}" ${s.status===o?"selected":""}>${o[0].toUpperCase()+o.slice(1)}</option>`).join("")}</select></div>
-        <div class="field"><label>Grade <span class="hint">out of 100</span></label><input class="input" type="number" name="grade" value="${s.grade??""}" min="0" max="100"/></div>
+          ${[["submitted","Awaiting review"],["reviewed","Reviewed (final)"],["returned","Returned for changes"]].map(([v,l])=>`<option value="${v}" ${s.status===v?"selected":""}>${l}</option>`).join("")}</select></div>
+        <div class="field"><label>Grade <span class="hint">out of ${pts}</span></label><input class="input" type="number" name="grade" value="${s.grade??""}" min="0" max="${pts}" step="1"/></div>
       </div>
-      <div class="field"><label>Feedback</label><textarea name="feedback" placeholder="What was strong, what to improve…">${esc(s.feedback||"")}</textarea></div>
+      <div class="field"><label>Feedback <span class="hint">the participant sees this exactly as written</span></label><textarea name="feedback" rows="7" placeholder="What was strong, what to improve…">${esc(s.feedback||"")}</textarea></div>
     </form>`,
     footerHTML:`<button class="btn btn--ghost" data-cancel>Cancel</button><button class="btn btn--primary" data-save>Save review</button>`});
   $("[data-cancel]").addEventListener("click",closeModal);
   $("[data-save]").addEventListener("click",async()=>{
     const f=$("[data-rf]");
-    try{ await db.review(s.id,{status:f.elements.status.value,grade:f.elements.grade.value===""?null:Number(f.elements.grade.value),feedback:f.elements.feedback.value.trim()}); toast("Review saved"); closeModal(); after(); }
+    const graw=f.elements.grade.value.trim();
+    const grade=graw===""?null:Math.round(Number(graw));
+    if(grade!=null && (isNaN(grade)||grade<0||grade>pts)){ toast(`Grade must be between 0 and ${pts}`,"err"); f.elements.grade.focus(); return; }
+    const feedback=f.elements.feedback.value.trim();
+    let status=f.elements.status.value;
+    // Giving a grade or feedback on a pending submission marks it reviewed.
+    if(status==="submitted" && (grade!=null || feedback)) status="reviewed";
+    try{ await db.review(s.id,{status,grade,feedback}); toast(status==="returned"?"Returned to participant":"Review saved"); closeModal(); after(); }
     catch(e){ toast(e.message,"err"); }
   });
 }
@@ -1896,14 +2101,42 @@ async function viewSession(mount,r){
 async function viewRecordings(mount){
   const courses=await db.courses();
   const cmap=Object.fromEntries(courses.map(c=>[c.id,c]));
-  const recs=(await db.allSessions()).filter(s=>s.recording_url);
+  const all=await db.allSessions();
+  const M=Auth.canManage;
+  const recs=all.filter(s=>s.recording_url);
   recs.sort((a,b)=>new Date(b.scheduled_at||0)-new Date(a.scheduled_at||0));
+  // sessions with no recording yet (managers can attach one)
+  const pending=all.filter(s=>!s.recording_url).sort((a,b)=>new Date(a.scheduled_at||0)-new Date(b.scheduled_at||0));
   // group by day
   const groups={};
   for(const s of recs){ const key=s.scheduled_at?fmtDate(s.scheduled_at):"Undated"; (groups[key]=groups[key]||[]).push(s); }
   const keys=Object.keys(groups);
+
+  const managerRow=(s)=>`<div class="rowc__act" style="gap:.35rem">
+      <a class="btn btn--primary btn--sm" href="${esc(s.recording_url)}" target="_blank" rel="noopener">${I.play} Watch ${I.ext}</a>
+      <button class="btn btn--ghost btn--sm" data-edit-rec="${s.id}" title="Edit link">${I.edit}</button>
+      <button class="btn btn--danger btn--sm" data-rm-rec="${s.id}" title="Remove recording">${I.trash}</button>
+    </div>`;
+  const staffRow=(s)=>`<div class="rowc__act"><a class="btn btn--primary btn--sm" href="${esc(s.recording_url)}" target="_blank" rel="noopener">${I.play} Watch ${I.ext}</a><span style="color:var(--muted-2)">${I.chev}</span></div>`;
+
   mount.innerHTML=`
-    <div class="page-h"><div><h1>Recordings</h1><p>Daily session recordings — catch up on anything you missed.</p></div></div>
+    <div class="page-h"><div><h1>Recordings</h1><p>Daily session recordings — catch up on anything you missed.</p></div>
+      ${M?`<button class="btn btn--primary" data-add-rec>${I.plus} Add recording</button>`:""}</div>
+
+    ${M&&pending.length?`
+      <div class="card card--pad" style="margin-bottom:1.4rem;border-color:var(--flame);background:linear-gradient(180deg,rgba(242,102,31,.06),transparent)">
+        <div class="between" style="align-items:center;margin-bottom:.6rem">
+          <h3 style="font-family:var(--font-d);margin:0">${I.clock||I.cal} Sessions waiting for a recording</h3>
+          <span class="count">${pending.length}</span></div>
+        <div class="rows">${pending.slice(0,8).map(s=>{const c=cmap[s.course_id];return `
+          <div class="rowc">
+            <div class="rowc__ic">${I.cal}</div>
+            <div class="rowc__main"><h4>${esc(s.title)}</h4>
+              <div class="sub"><span>${c?esc(c.title):"General"}</span><span>${fmtDT(s.scheduled_at)}</span><span>${esc(s.platform||"Zoom")}</span></div></div>
+            <div class="rowc__act"><button class="btn btn--dark btn--sm" data-attach-rec="${s.id}">${I.plus} Add recording</button></div></div>`;}).join("")}</div>
+        ${pending.length>8?`<p class="muted" style="margin:.7rem 0 0;font-size:.85rem">+ ${pending.length-8} more in the Schedule.</p>`:""}
+      </div>`:""}
+
     ${recs.length?keys.map(k=>`
       <div class="section-h"><h2>${esc(k)}</h2><span class="count">${groups[k].length}</span></div>
       <div class="rows">${groups[k].map(s=>{const c=cmap[s.course_id];return `
@@ -1911,9 +2144,59 @@ async function viewRecordings(mount){
           <div class="rowc__ic">${I.play}</div>
           <div class="rowc__main"><h4>${esc(s.title)}</h4>
             <div class="sub"><span>${c?esc(c.title):"General"}</span><span>${fmtDT(s.scheduled_at)}</span><span>${esc(s.platform||"Zoom")}</span></div></div>
-          <div class="rowc__act"><a class="btn btn--primary btn--sm" href="${esc(s.recording_url)}" target="_blank" rel="noopener">${I.play} Watch ${I.ext}</a><span style="color:var(--muted-2)">${I.chev}</span></div></div>`;}).join("")}</div>`).join("")
-      :emptyBlock("No recordings yet","Recording links appear here as soon as trainers post them after each class.",I.play)}`;
-  mount.querySelectorAll("[data-open-session]").forEach(el=>el.addEventListener("click",e=>{ if(e.target.closest('a')) return; location.hash=`#/session/${el.dataset.openSession}`; }));
+          ${M?managerRow(s):staffRow(s)}</div>`;}).join("")}</div>`).join("")
+      :emptyBlock("No recordings yet",M?"Use “Add recording” above to post the first one.":"Recording links appear here as soon as trainers post them after each class.",I.play)}`;
+
+  mount.querySelectorAll("[data-open-session]").forEach(el=>el.addEventListener("click",e=>{ if(e.target.closest('a,button')) return; location.hash=`#/session/${el.dataset.openSession}`; }));
+  if(M){
+    $("[data-add-rec]")?.addEventListener("click",()=>addRecording());
+    mount.querySelectorAll("[data-attach-rec]").forEach(b=>b.addEventListener("click",()=>addRecording(b.dataset.attachRec)));
+    mount.querySelectorAll("[data-edit-rec]").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();addRecording(b.dataset.editRec);}));
+    mount.querySelectorAll("[data-rm-rec]").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();
+      confirmModal("Remove the recording link from this session? The session stays in the schedule; only the recording link is cleared.",
+        async()=>{ await db.update("sessions",b.dataset.rmRec,{recording_url:""}); toast("Recording removed"); render(); });
+    }));
+  }
+}
+
+// Add / attach / edit a recording. preId (optional) = a session id to attach the recording to (or edit).
+async function addRecording(preId){
+  const [all,courses]=await Promise.all([db.allSessions(),db.courses()]);
+  const pre=preId?all.find(s=>s.id===preId):null;
+  const pending=all.filter(s=>!s.recording_url).sort((a,b)=>new Date(a.scheduled_at||0)-new Date(b.scheduled_at||0));
+  // when editing an existing recording, make sure its own session is selectable
+  const sessOpts=[{value:"",label:"➕ New recording entry (not in the schedule)"}]
+    .concat((pre&&pre.recording_url?[pre]:[]).concat(pending).map(s=>({value:s.id,label:`${s.scheduled_at?fmtDate(s.scheduled_at)+" · ":""}${s.title}`})));
+  const editing = !!(pre && pre.recording_url);
+  formModal({
+    title: editing?"Edit recording link":(pre?"Add recording":"Add a recording"),
+    submitLabel: editing?"Save link":"Save recording", wide:true,
+    fields:[
+      {name:"session_id",label:"For which session?",type:"select",options:sessOpts,
+        hint:"Pick a scheduled session, or choose “New recording entry” to add a standalone one."},
+      {name:"recording_url",label:"Recording link",required:true,placeholder:"https://…  (Zoom cloud, YouTube, Google Drive)"},
+      {name:"title",label:"Title",hint:"only for a new standalone entry",placeholder:"e.g. Day 4 — Chi-square & ANOVA"},
+      {row:[
+        {name:"scheduled_at",label:"Date & time",type:"datetime"},
+        {name:"platform",label:"Platform",placeholder:"Zoom (Online)"},
+      ]},
+      {name:"course_id",label:"Course",type:"select",options:[{value:"",label:"— General —"},...courses.map(c=>({value:c.id,label:c.title}))]},
+    ],
+    values:{ session_id: pre?pre.id:"", recording_url: pre?.recording_url||"", platform:"Zoom (Online)", course_id: courses[0]?.id||"" },
+    onSubmit:async(d)=>{
+      if(!/^https?:\/\//i.test(d.recording_url)) throw new Error("Enter a full link starting with https://");
+      if(d.session_id){
+        await db.update("sessions",d.session_id,{recording_url:d.recording_url});
+      }else{
+        if(!d.title) throw new Error("Give the recording a title, or pick a scheduled session above.");
+        await db.create("sessions",{
+          title:d.title, recording_url:d.recording_url,
+          scheduled_at:d.scheduled_at||null, platform:d.platform||"Zoom",
+          duration_mins:120, course_id:d.course_id||null, sort_order:Date.now()
+        });
+      }
+      toast("Recording saved"); render();
+    }});
 }
 
 /* =============================================================== FORUM */
