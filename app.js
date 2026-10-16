@@ -216,7 +216,37 @@ const DemoStore = (() => {
     {id:"rep2",thread_id:"th1",author_id:"u-2",body:"Switched to HTTPS and it worked. Thanks!",is_answer:false,created_at:"2026-09-05T11:00:00+05:30"},
     {id:"rep3",thread_id:"th2",author_id:"u-trainer",body:"Yes — Git, Google Drive or a recording link all work. At least one is required.",is_answer:true,created_at:"2026-09-06T10:30:00+05:30"},
   ];
-  return {uid,courses,sessions,materials,notes,assignments,profiles,submissions,quizzes,quiz_questions,quiz_attempts,capstones,capstone_submissions,threads,thread_replies};
+  // demo live contest: opened a minute ago, closes in 29 minutes
+  const _n=Date.now();
+  quizzes.push({id:"qzc",course_id:"c2",title:"Live contest — Python warm-up",description:"10-minute demo contest.",pass_pct:60,is_published:true,sort_order:0,is_contest:true,opens_at:new Date(_n-60e3).toISOString(),closes_at:new Date(_n+29*60e3).toISOString()});
+  quiz_questions.push(
+    {id:"qc1",quiz_id:"qzc",prompt:"What does `len([1,2,3])` return?",options:["2","3","[1,2,3]","Error"],correct_index:1,explanation:"len counts the items.",points:1,sort_order:1},
+    {id:"qc2",quiz_id:"qzc",prompt:"What is printed?\n\n    x = [1,2,3]\n    print(x[-1])",options:["1","3","-1","Error"],correct_index:1,explanation:"Index -1 is the last item.",points:1,sort_order:2});
+  const entries={};
+  const name=id=>(profiles.find(p=>p.id===id)||{}).full_name;
+  const contestStart=(qid)=>{
+    const z=quizzes.find(q=>q.id===qid); const me=Auth.user.id; const k=qid+"|"+me;
+    if(new Date()>=new Date(z.closes_at)) throw new Error("Contest is closed");
+    if(entries[k]?.submitted) throw new Error("You have already submitted this contest");
+    entries[k]=entries[k]||{started_at:new Date().toISOString(),submitted:false};
+    return {started_at:entries[k].started_at,closes_at:z.closes_at,server_now:new Date().toISOString(),
+      questions:quiz_questions.filter(x=>x.quiz_id===qid).sort((a,b)=>a.sort_order-b.sort_order).map(({id,prompt,options,points})=>({id,prompt,options,points}))};
+  };
+  const contestSubmit=(qid,ans)=>{
+    const me=Auth.user.id; const k=qid+"|"+me; const e=entries[k];
+    if(!e) throw new Error("Start the contest first"); if(e.submitted) throw new Error("You have already submitted this contest");
+    let s=0,t=0; quiz_questions.filter(x=>x.quiz_id===qid).forEach(x=>{ t+=x.points||1; if(ans[x.id]===x.correct_index) s+=x.points||1; });
+    e.submitted=true; const secs=Math.round((Date.now()-new Date(e.started_at))/1000);
+    quiz_attempts.push({id:uid("at"),quiz_id:qid,user_id:me,score:s,total:t,pct:Math.round(s/t*100),passed:s/t>=.6,answers:ans,submitted_at:new Date().toISOString(),started_at:e.started_at,seconds_taken:secs});
+    return {score:s,total:t,seconds:secs};
+  };
+  const rankRows=(rows,cmp)=>{ rows.sort(cmp); let r=0,prev=null; rows.forEach((x,i)=>{ if(!prev||cmp(prev,x)!==0) r=i+1; x.rank=r; prev=x; }); return rows; };
+  const contestBoard=(qid)=>rankRows(quiz_attempts.filter(a=>a.quiz_id===qid).map(a=>({user_id:a.user_id,full_name:name(a.user_id),score:a.score,total:a.total,seconds_taken:a.seconds_taken,submitted_at:a.submitted_at})),
+    (a,b)=>(b.score-a.score)||(a.seconds_taken-b.seconds_taken));
+  const practiceBoard=(qid)=>{ const m={}; quiz_attempts.filter(a=>a.quiz_id===qid).forEach(a=>{ const x=m[a.user_id]||(m[a.user_id]={user_id:a.user_id,full_name:name(a.user_id),best_pct:0,attempts:0}); x.best_pct=Math.max(x.best_pct,a.pct); x.attempts++; });
+    return rankRows(Object.values(m),(a,b)=>(b.best_pct-a.best_pct)||(a.attempts-b.attempts)).slice(0,20); };
+  quiz_attempts.push({id:"atc",quiz_id:"qzc",user_id:"u-3",score:1,total:2,pct:50,passed:false,answers:{qc1:1,qc2:0},submitted_at:new Date().toISOString(),seconds_taken:95});
+  return {uid,courses,sessions,materials,notes,assignments,profiles,submissions,quizzes,quiz_questions,quiz_attempts,capstones,capstone_submissions,threads,thread_replies,contestStart,contestSubmit,contestBoard,practiceBoard};
 })();
 
 /* ---- unified data API ---- */
@@ -345,6 +375,23 @@ const db = {
     if(DEMO){ const r={id:DemoStore.uid("at"),...row}; DemoStore.quiz_attempts.push(r); return r; }
     const {data,error}=await sb.from("quiz_attempts").insert(row).select().single();
     if(error) throw error; return data;
+  },
+  /* ---- live contests & boards ---- */
+  async contestStart(qid){
+    if(DEMO) return DemoStore.contestStart(qid);
+    const {data,error}=await sb.rpc("contest_start",{qid}); if(error) throw error; return data;
+  },
+  async contestSubmit(qid,ans){
+    if(DEMO) return DemoStore.contestSubmit(qid,ans);
+    const {data,error}=await sb.rpc("contest_submit",{qid,ans}); if(error) throw error; return data;
+  },
+  async contestBoard(qid){
+    if(DEMO) return DemoStore.contestBoard(qid);
+    const {data,error}=await sb.rpc("contest_leaderboard",{qid}); if(error) throw error; return data||[];
+  },
+  async practiceBoard(qid){
+    if(DEMO) return DemoStore.practiceBoard(qid);
+    const {data,error}=await sb.rpc("practice_leaderboard",{qid}); if(error) throw error; return data||[];
   },
   /* ---- capstone ---- */
   async capstones(){
@@ -493,6 +540,7 @@ function route(){
 
 /* ============================================================ RENDER */
 async function render(){
+  QTimers.clear();
   const root=$("#root");
   if(!Auth.user){ renderAuth(root); return; }
   if(!Auth.profile){ try{ Auth.profile=await db.profile(Auth.user.id);}catch{} }
@@ -629,7 +677,7 @@ function navForRole(){
     {name:"prereq",label:"Prerequisites",icon:I.book},
     {name:"notes",label:"Faculty notes",icon:I.note},
     {name:"assignments",label:"Assignments",icon:I.clip},
-    {name:"quizzes",label:"Practice quizzes",icon:I.quiz},
+    {name:"quizzes",label:"Quizzes & contests",icon:I.quiz},
     {name:"playground",label:"Python playground",icon:I.git},
     {name:"capstone",label:"Capstone project",icon:I.rocket},
     {name:"forum",label:"Discussion forum",icon:I.chat},
@@ -776,6 +824,8 @@ async function dashStaff(mount){
   wireCourseOpen(mount);
   mount.querySelectorAll("[data-open-assign]").forEach(el=>el.addEventListener("click",()=>location.hash=`#/assignment/${el.dataset.openAssign}`));
   $("[data-cap]")?.addEventListener("click",()=>location.hash="#/capstone");
+  const _cb=contestBannerHTML(quizzes);
+  if(_cb){ mount.insertAdjacentHTML("afterbegin",_cb); $("[data-cbanner]").addEventListener("click",e=>location.hash=`#/quiz/${e.currentTarget.dataset.cbanner}`); }
 }
 
 /* ---- Trainer dashboard ---- */
@@ -1697,30 +1747,170 @@ async function viewMySubmissions(mount){
   mount.querySelectorAll("[data-open]").forEach(el=>el.addEventListener("click",()=>location.hash=`#/assignment/${el.dataset.open}`));
 }
 
-/* =============================================================== QUIZZES */
+/* =============================================================== QUIZZES
+   Two kinds of quiz share the quizzes / quiz_questions tables:
+   · Practice quiz — gamified: one question at a time, instant feedback,
+     streaks, points, stars, XP/levels/badges and a best-score board.
+   · Live contest (is_contest) — open only between opens_at and closes_at,
+     questions served by contest_start() without answers, marked on the
+     server by contest_submit(), one attempt each, ranked leaderboard
+     (score, then time taken). Answers become readable after closes_at.
+   ===================================================================== */
+
+/* ---- timers that must die when the route changes ---- */
+const QTimers = {
+  ids:[],
+  every(fn,ms){ const id=setInterval(fn,ms); this.ids.push(id); return id; },
+  later(fn,ms){ const id=setTimeout(fn,ms); this.ids.push(id); return id; },
+  clear(){ this.ids.forEach(id=>{ clearInterval(id); clearTimeout(id); }); this.ids=[]; },
+};
+
+/* ---- small helpers ---- */
+function qfmt(text){
+  // escape, then: lines indented 4 spaces → code block, `x` → inline code
+  const lines=String(text||"").split("\n");
+  let html="", code=[];
+  const flush=()=>{ if(code.length){ html+=`<pre class="qpre">${code.map(esc).join("\n")}</pre>`; code=[]; } };
+  lines.forEach((ln,i)=>{
+    if(/^ {4}/.test(ln)){ code.push(ln.slice(4)); return; }
+    flush();
+    const t=esc(ln).replace(/`([^`]+)`/g,'<code class="qcode">$1</code>');
+    html+=(html&&!html.endsWith("</pre>")?"<br>":"")+t;
+  });
+  flush();
+  return html;
+}
+function contestState(q, now=Date.now()){
+  if(!q.is_contest) return "practice";
+  if(q.opens_at && now < new Date(q.opens_at).getTime()) return "upcoming";
+  if(q.closes_at && now >= new Date(q.closes_at).getTime()) return "ended";
+  return "live";
+}
+function fmtClock(ms){
+  ms=Math.max(0,ms); const s=Math.floor(ms/1000);
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60;
+  const p=n=>String(n).padStart(2,"0");
+  return h?`${h}:${p(m)}:${p(ss)}`:`${p(m)}:${p(ss)}`;
+}
+function fmtSecs(s){ if(s==null) return "—"; s=Math.round(s); return `${Math.floor(s/60)}m ${String(s%60).padStart(2,"0")}s`; }
+function fmtTime(v){ return new Date(v).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit"}); }
+function starsFor(pct){ return pct>=100?3:pct>=75?2:pct>=50?1:0; }
+function starRow(n){ return [0,1,2].map(i=>`<span class="qstar ${i<n?"on":""}">★</span>`).join(""); }
+function confetti(){
+  const box=document.createElement("div"); box.className="confetti";
+  const cols=["#f2661f","#5a2f9e","#0f7d8c","#152a63","#f5b301","#e2372a"];
+  for(let i=0;i<90;i++){
+    const s=document.createElement("i");
+    s.style.left=Math.random()*100+"vw";
+    s.style.background=cols[i%cols.length];
+    s.style.animationDelay=(Math.random()*0.6)+"s";
+    s.style.animationDuration=(2.2+Math.random()*1.6)+"s";
+    s.style.transform=`rotate(${Math.random()*360}deg)`;
+    box.appendChild(s);
+  }
+  document.body.appendChild(box);
+  setTimeout(()=>box.remove(),4500);
+}
+
+/* ---- XP, levels & badges (computed from the learner's own attempts) ---- */
+const LEVELS=[
+  {xp:0,name:"Rookie"},{xp:150,name:"Explorer"},{xp:400,name:"Analyst"},
+  {xp:800,name:"Data Wrangler"},{xp:1400,name:"Model Builder"},{xp:2200,name:"ML Ninja"},{xp:3200,name:"Grandmaster"},
+];
+function computeXP(attempts, quizzes){
+  const qmap=Object.fromEntries(quizzes.map(q=>[q.id,q]));
+  const best={};
+  for(const a of attempts){ if(!best[a.quiz_id]||a.pct>best[a.quiz_id].pct) best[a.quiz_id]=a; }
+  let xp=0;
+  const bestList=Object.values(best);
+  for(const b of bestList){
+    xp+= (b.score||0)*10;              // 10 XP per correct answer (best run)
+    if(b.passed) xp+=50;                // pass bonus
+    if(b.pct===100) xp+=50;             // perfect bonus
+    if(qmap[b.quiz_id]?.is_contest) xp+=50; // turned up for a contest
+  }
+  xp+= Math.max(0, attempts.filter(a=>!qmap[a.quiz_id]?.is_contest).length - bestList.length)*5; // practice-makes-perfect
+  let li=0; LEVELS.forEach((l,i)=>{ if(xp>=l.xp) li=i; });
+  const cur=LEVELS[li], next=LEVELS[li+1];
+  const badges=[];
+  if(attempts.length) badges.push({ic:"🎯",t:"First steps",d:"Finished your first quiz"});
+  if(bestList.some(b=>b.pct===100)) badges.push({ic:"💯",t:"Perfectionist",d:"Scored 100% on a quiz"});
+  if(bestList.filter(b=>b.passed).length>=3) badges.push({ic:"🏅",t:"Hat-trick",d:"Passed three quizzes"});
+  if(bestList.some(b=>qmap[b.quiz_id]?.is_contest)) badges.push({ic:"⚔️",t:"Contender",d:"Took part in a live contest"});
+  if(attempts.filter(a=>!qmap[a.quiz_id]?.is_contest).length>=10) badges.push({ic:"🔁",t:"Grinder",d:"Ten practice runs"});
+  return {xp, level:li+1, name:cur.name, next, pctToNext: next? Math.round((xp-cur.xp)/(next.xp-cur.xp)*100):100, badges};
+}
+
+/* ---------------------------------------------------------------- list */
 async function viewQuizzes(mount){
   const [quizzes,courses,attempts]=await Promise.all([db.quizzes(),db.courses(),db.myAttempts(Auth.user.id).catch(()=>[])]);
   const cmap=Object.fromEntries(courses.map(c=>[c.id,c]));
   const best={};
   for(const at of attempts){ if(!best[at.quiz_id]||at.pct>best[at.quiz_id].pct) best[at.quiz_id]=at; }
+  const contests=quizzes.filter(q=>q.is_contest).sort((a,b)=>new Date(a.opens_at||0)-new Date(b.opens_at||0));
+  const activeC=contests.filter(q=>contestState(q)!=="ended");
+  const pastC=contests.filter(q=>contestState(q)==="ended").reverse();
+  const practice=quizzes.filter(q=>!q.is_contest);
+  const me=computeXP(attempts,quizzes);
+
+  const contestCard=(q)=>{
+    const st=contestState(q); const mine=best[q.id];
+    const pill= st==="live"?`<span class="cpill cpill--live"><i></i>LIVE</span>`: st==="upcoming"?`<span class="cpill cpill--soon">UPCOMING</span>`:`<span class="cpill cpill--done">ENDED</span>`;
+    const timer= st==="live"?`Ends in <b data-cd="${q.closes_at}">${fmtClock(new Date(q.closes_at)-Date.now())}</b>`
+               : st==="upcoming"?`Starts in <b data-cd="${q.opens_at}">${fmtClock(new Date(q.opens_at)-Date.now())}</b>`
+               : `Ended ${fmtDT(q.closes_at)}`;
+    const cta= Auth.canManage?"Manage":
+      mine?"View result" : st==="live"?"Enter contest" : st==="upcoming"?"Details":"View leaderboard";
+    return `<button class="contest ${st==="live"?"contest--live":""}" data-open-quiz="${q.id}">
+      <div class="contest__top">${pill}<span class="contest__when">${fmtDate(q.opens_at)} · ${q.opens_at?fmtTime(q.opens_at):""}${q.closes_at?" – "+fmtTime(q.closes_at):""}</span></div>
+      <h3>⚔️ ${esc(q.title)}</h3>
+      <p>${esc(q.description||"")}</p>
+      <div class="contest__foot"><span>${timer}</span>
+        ${mine?`<span class="contest__mine">Your score: <b>${mine.score}/${mine.total}</b></span>`:""}
+        <span class="btn btn--primary btn--sm">${cta} ${I.chev}</span></div>
+    </button>`;
+  };
+
   mount.innerHTML=`
-    <div class="page-h"><div><h1>Practice quizzes</h1><p>Check your understanding — auto-graded, take them as many times as you like.</p></div>
-      ${Auth.canManage?`<button class="btn btn--primary" data-add>${I.plus} New quiz</button>`:""}</div>
-    <div class="grid">${quizzes.map(q=>{
-      const c=cmap[q.course_id]; const b=best[q.id];
-      return `<button class="course" data-open-quiz="${q.id}" data-accent="violet">
-        <div class="course__band" style="color:#fff">${I.quiz}</div>
+    <div class="page-h"><div><h1>Quizzes &amp; contests</h1><p>Practice at your own pace, earn XP — and test yourself against everyone in live contests.</p></div>
+      ${Auth.canManage?`<button class="btn btn--primary" data-add>${I.plus} New quiz / contest</button>`:""}</div>
+
+    ${!Auth.canManage?`<div class="xpbar">
+      <div class="xpbar__lvl"><div class="xpbar__badge">L${me.level}</div><div><b>${esc(me.name)}</b><span>${me.xp} XP${me.next?` · ${me.next.xp-me.xp} XP to ${esc(me.next.name)}`:" · max level"}</span></div></div>
+      <div class="xpbar__track"><div style="width:${me.pctToNext}%"></div></div>
+      <div class="xpbar__badges">${me.badges.length?me.badges.map(b=>`<span class="bdg" title="${esc(b.d)}">${b.ic} ${esc(b.t)}</span>`).join(""):`<span class="muted" style="font-size:.85rem">Finish a quiz to earn your first badge</span>`}</div>
+    </div>`:""}
+
+    ${activeC.length?`<div class="section-h"><h2>Live &amp; upcoming contests</h2><span class="count">${activeC.length}</span></div>
+      <div class="stack" style="margin-bottom:1.6rem">${activeC.map(contestCard).join("")}</div>`:""}
+
+    <div class="section-h"><h2>Practice quizzes</h2><span class="count">${practice.length}</span></div>
+    <div class="grid">${practice.map(q=>{
+      const c=cmap[q.course_id]; const b=best[q.id]; const st=b?starsFor(b.pct):0;
+      return `<button class="course qcard" data-open-quiz="${q.id}" data-accent="violet">
+        <div class="course__band qcard__band"><span class="qcard__stars">${starRow(st)}</span></div>
         <div class="course__body">
           <h3>${esc(q.title)}</h3>
           <p>${esc(q.description||"")}</p>
           <div class="course__meta">
             <span>${I.book}${c?esc(c.title):"General"}</span>
-            ${b?`<span>${b.passed?I.check:I.clock} Best ${b.pct}%</span>`:`<span>${I.play} ${Auth.canManage?"Manage":"Not attempted"}</span>`}
+            ${b?`<span>${b.passed?I.check:I.clock} Best ${b.pct}%</span>`:`<span>${I.play} ${Auth.canManage?"Manage":"Play"}</span>`}
           </div>
         </div></button>`;
-    }).join("")||emptyBlock("No quizzes yet","Trainers can add practice quizzes here.",I.quiz)}</div>`;
+    }).join("")||emptyBlock("No practice quizzes yet","Trainers can add practice quizzes here.",I.quiz)}</div>
+
+    ${pastC.length?`<div class="section-h" style="margin-top:1.6rem"><h2>Past contests</h2><span class="count">${pastC.length}</span></div>
+      <div class="stack">${pastC.map(contestCard).join("")}</div>`:""}`;
+
   mount.querySelectorAll("[data-open-quiz]").forEach(el=>el.addEventListener("click",()=>location.hash=`#/quiz/${el.dataset.openQuiz}`));
   $("[data-add]")?.addEventListener("click",()=>editQuiz(null));
+  // live countdowns; re-render when a contest opens or closes
+  const tick=()=>{
+    let flip=false;
+    mount.querySelectorAll("[data-cd]").forEach(el=>{ const ms=new Date(el.dataset.cd)-Date.now(); if(ms<=0) flip=true; el.textContent=fmtClock(ms); });
+    if(flip){ QTimers.clear(); render(); }
+  };
+  if(mount.querySelector("[data-cd]")) QTimers.every(tick,1000);
 }
 function quizRow(q){
   return `<div class="rowc" data-open-quiz="${q.id}" style="cursor:pointer">
@@ -1729,107 +1919,407 @@ function quizRow(q){
     <div class="rowc__act"><span style="color:var(--muted-2)">${I.chev}</span></div></div>`;
 }
 
+/* ---------------------------------------------------------- one quiz */
 async function viewQuiz(mount,r){
   const q=await db.quiz(r.id);
   if(!q){ mount.innerHTML=emptyBlock("Quiz not found",""); return; }
+  if(Auth.canManage) return manageQuiz(mount,q);
+  if(q.is_contest) return contestFlow(mount,q);
   const questions=await db.quizQuestions(q.id);
-
-  if(Auth.canManage){
-    mount.innerHTML=`
-      <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
-      <div class="page-h"><div><h1>${esc(q.title)}</h1><p>${esc(q.description||"")} · Pass mark ${q.pass_pct}%</p></div>
-        <div style="display:flex;gap:.5rem">
-          <button class="btn btn--ghost btn--sm" data-edit-quiz>${I.edit} Edit quiz</button>
-          <button class="btn btn--danger btn--sm" data-del-quiz>${I.trash}</button></div></div>
-      <div class="section-h"><h2>Questions</h2><span class="count">${questions.length}</span>
-        <button class="btn btn--primary btn--sm" style="margin-left:auto" data-add-q>${I.plus} Add question</button></div>
-      <div class="stack">${questions.map((qq,i)=>`
-        <div class="card card--pad">
-          <div class="between" style="align-items:flex-start">
-            <div style="min-width:0"><b>Q${i+1}.</b> ${esc(qq.prompt)}</div>
-            <div style="display:flex;gap:.3rem;flex:none">
-              <button class="btn btn--ghost btn--sm" data-edit-q="${qq.id}">${I.edit}</button>
-              <button class="btn btn--danger btn--sm" data-del-q="${qq.id}">${I.trash}</button></div>
-          </div>
-          <ol style="margin:.7rem 0 0;padding-left:1.2rem" class="muted">${(qq.options||[]).map((o,oi)=>`<li style="${oi===qq.correct_index?"color:var(--teal);font-weight:600":""}">${esc(o)}${oi===qq.correct_index?" ✓":""}</li>`).join("")}</ol>
-          ${qq.explanation?`<p class="muted" style="font-size:.85rem;margin:.6rem 0 0"><b>Why:</b> ${esc(qq.explanation)}</p>`:""}
-        </div>`).join("")||`<p class="muted">No questions yet — add the first one.</p>`}</div>`;
-    $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes");
-    $("[data-edit-quiz]").addEventListener("click",()=>editQuiz(q));
-    $("[data-del-quiz]").addEventListener("click",()=>confirmModal("Delete this quiz and its questions?",async()=>{await db.remove("quizzes",q.id);toast("Quiz deleted");location.hash="#/quizzes";}));
-    $("[data-add-q]").addEventListener("click",()=>editQuestion(q.id,null,questions.length));
-    mount.querySelectorAll("[data-edit-q]").forEach(b=>b.addEventListener("click",()=>editQuestion(q.id,questions.find(x=>x.id===b.dataset.editQ),questions.length)));
-    mount.querySelectorAll("[data-del-q]").forEach(b=>b.addEventListener("click",()=>confirmModal("Delete this question?",async()=>{await db.remove("quiz_questions",b.dataset.delQ);toast("Question deleted");render();})));
-    return;
-  }
-
-  runQuiz(mount,q,questions);
+  runPractice(mount,q,questions);
 }
 
-function runQuiz(mount,q,questions){
-  if(!questions.length){ mount.innerHTML=`<button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>${emptyBlock("No questions yet","This quiz has no questions to answer.",I.quiz)}`; $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes"); return; }
-  const answers=new Array(questions.length).fill(null);
-  const paint=()=>{
-    mount.innerHTML=`
-      <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
-      <div class="card card--pad" style="margin-bottom:1rem">
-        <h1 style="font-family:var(--font-d);font-size:1.5rem;margin:0 0 .2rem">${esc(q.title)}</h1>
-        <p class="muted" style="margin:0">${esc(q.description||"")} · ${questions.length} questions · pass mark ${q.pass_pct}%</p>
-      </div>
-      <form data-quizform>
-        ${questions.map((qq,i)=>`
-          <div class="card card--pad" style="margin-bottom:.9rem" data-q="${i}">
-            <div style="font-weight:600;margin-bottom:.7rem"><span class="flame">Q${i+1}.</span> ${esc(qq.prompt)}</div>
-            <div class="qopts">${(qq.options||[]).map((o,oi)=>`
-              <label class="qopt"><input type="radio" name="q${i}" value="${oi}"/><span>${esc(o)}</span></label>`).join("")}</div>
-          </div>`).join("")}
-        <button class="btn btn--primary" data-grade style="margin-top:.4rem">Submit quiz</button>
-      </form>`;
-    $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes");
-    mount.querySelectorAll(".qopt input").forEach(inp=>inp.addEventListener("change",e=>{
-      const qi=Number(e.target.name.slice(1)); answers[qi]=Number(e.target.value);
-      e.target.closest("[data-q]").querySelectorAll(".qopt").forEach(l=>l.classList.remove("sel"));
-      e.target.closest(".qopt").classList.add("sel");
-    }));
-    $("[data-grade]").addEventListener("click", async (e)=>{
-      e.preventDefault();
-      if(answers.some(a=>a===null)){ toast("Answer every question first","err"); return; }
-      let score=0; questions.forEach((qq,i)=>{ if(answers[i]===qq.correct_index) score+=(qq.points||1); });
-      const total=questions.reduce((s,qq)=>s+(qq.points||1),0);
-      const pct=Math.round(score/total*100); const passed=pct>=(q.pass_pct||60);
-      try{ await db.saveAttempt({quiz_id:q.id,user_id:Auth.user.id,score,total,pct,passed,answers,submitted_at:new Date().toISOString()}); }catch(err){ /* still show result */ }
-      showResult(mount,q,questions,answers,{score,total,pct,passed},paint);
-    });
-  };
-  paint();
-}
-function showResult(mount,q,questions,answers,res,retry){
+/* ---- manager view ---- */
+async function manageQuiz(mount,q){
+  const questions=await db.quizQuestions(q.id);
+  const st=contestState(q);
   mount.innerHTML=`
     <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
-    <div class="hero" style="text-align:center">
-      <div class="peak" style="right:auto;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.14);width:120px">${res.passed?I.trophy:I.quiz}</div>
-      <div class="kicker">${esc(q.title)}</div>
-      <h2 style="font-size:2.6rem">${res.pct}%</h2>
-      <p>${res.passed?"Passed — nicely done! 🎉":"Not quite — review the notes and try again."} You scored ${res.score} of ${res.total}.</p>
-    </div>
-    <div class="section-h"><h2>Review answers</h2></div>
-    <div class="stack">${questions.map((qq,i)=>{
-      const ok=answers[i]===qq.correct_index;
-      return `<div class="card card--pad">
-        <div style="font-weight:600;margin-bottom:.5rem">${ok?`<span class="teal">${I.check}</span>`:`<span class="flame">${I.alert}</span>`} Q${i+1}. ${esc(qq.prompt)}</div>
-        <div class="qopts">${(qq.options||[]).map((o,oi)=>{
-          let cls=""; if(oi===qq.correct_index) cls="right"; else if(oi===answers[i]) cls="wrong";
-          return `<div class="qopt review ${cls}"><span>${esc(o)}</span>${oi===qq.correct_index?`<b class="teal">correct</b>`:(oi===answers[i]?`<b class="flame">your answer</b>`:"")}</div>`;
-        }).join("")}</div>
-        ${qq.explanation?`<p class="muted" style="font-size:.85rem;margin:.6rem 0 0"><b>Why:</b> ${esc(qq.explanation)}</p>`:""}
-      </div>`;
-    }).join("")}</div>
-    <div style="display:flex;gap:.6rem;margin-top:1.2rem">
-      <button class="btn btn--primary" data-retry>Try again</button>
-      <a class="btn btn--ghost" href="#/quizzes">Back to quizzes</a>
-    </div>`;
+    <div class="page-h"><div><h1>${q.is_contest?"⚔️ ":""}${esc(q.title)}</h1>
+      <p>${esc(q.description||"")}${q.is_contest
+        ?` · <b>Live contest</b> ${fmtDT(q.opens_at)} – ${q.closes_at?fmtTime(q.closes_at):"?"} · <span class="cpill cpill--${st==="live"?"live":st==="upcoming"?"soon":"done"}">${st==="live"?"<i></i>":""}${st.toUpperCase()}</span>`
+        :` · Practice · pass mark ${q.pass_pct}%`}</p></div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn--ghost btn--sm" data-edit-quiz>${I.edit} Edit</button>
+        <button class="btn btn--danger btn--sm" data-del-quiz>${I.trash}</button></div></div>
+    ${q.is_contest?`<div class="section-h"><h2>Leaderboard</h2><span class="muted" style="font-size:.8rem;margin-left:.5rem" data-lb-note></span></div>
+      <div data-lb class="card card--pad" style="margin-bottom:1.4rem"><div class="spinner"></div></div>`:""}
+    <div class="section-h"><h2>Questions</h2><span class="count">${questions.length}</span>
+      <button class="btn btn--primary btn--sm" style="margin-left:auto" data-add-q>${I.plus} Add question</button></div>
+    <div class="stack">${questions.map((qq,i)=>`
+      <div class="card card--pad">
+        <div class="between" style="align-items:flex-start">
+          <div style="min-width:0"><b>Q${i+1}.</b> ${qfmt(qq.prompt)}</div>
+          <div style="display:flex;gap:.3rem;flex:none">
+            <button class="btn btn--ghost btn--sm" data-edit-q="${qq.id}">${I.edit}</button>
+            <button class="btn btn--danger btn--sm" data-del-q="${qq.id}">${I.trash}</button></div>
+        </div>
+        <ol style="margin:.7rem 0 0;padding-left:1.2rem" class="muted">${(qq.options||[]).map((o,oi)=>`<li style="${oi===qq.correct_index?"color:var(--teal);font-weight:600":""}">${qfmt(o)}${oi===qq.correct_index?" ✓":""}</li>`).join("")}</ol>
+        ${qq.explanation?`<p class="muted" style="font-size:.85rem;margin:.6rem 0 0"><b>Why:</b> ${qfmt(qq.explanation)}</p>`:""}
+      </div>`).join("")||`<p class="muted">No questions yet — add the first one.</p>`}</div>`;
   $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes");
-  $("[data-retry]").addEventListener("click",retry);
+  $("[data-edit-quiz]").addEventListener("click",()=>editQuiz(q));
+  $("[data-del-quiz]").addEventListener("click",()=>confirmModal("Delete this quiz, its questions and all attempts?",async()=>{await db.remove("quizzes",q.id);toast("Quiz deleted");location.hash="#/quizzes";}));
+  $("[data-add-q]").addEventListener("click",()=>editQuestion(q.id,null,questions.length));
+  mount.querySelectorAll("[data-edit-q]").forEach(b=>b.addEventListener("click",()=>editQuestion(q.id,questions.find(x=>x.id===b.dataset.editQ),questions.length)));
+  mount.querySelectorAll("[data-del-q]").forEach(b=>b.addEventListener("click",()=>confirmModal("Delete this question?",async()=>{await db.remove("quiz_questions",b.dataset.delQ);toast("Question deleted");render();})));
+  if(q.is_contest){
+    const box=$("[data-lb]");
+    const load=async()=>{ try{ const rows=await db.contestBoard(q.id); box.innerHTML=boardHTML(rows,{contest:true}); const n=$("[data-lb-note]"); if(n) n.textContent=`${rows.length} submitted · updated ${new Date().toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",second:"2-digit"})}`; }catch(e){ box.innerHTML=`<p class="muted">${esc(e.message)}</p>`; } };
+    await load();
+    if(st!=="ended") QTimers.every(load,15000);
+  }
+}
+
+/* ---- leaderboard table ---- */
+function boardHTML(rows,{contest=false,limit=50}={}){
+  if(!rows.length) return `<p class="muted" style="margin:0">No entries yet — be the first on the board.</p>`;
+  const medal=r=>r===1?"🥇":r===2?"🥈":r===3?"🥉":`<span class="lb__n">${r}</span>`;
+  const top=rows.filter(r=>r.rank<=3).slice(0,3);
+  const podium = top.length>=1 ? `<div class="podium">${[1,0,2].map(i=>top[i]?`
+      <div class="podium__col podium__col--${top[i].rank}">
+        <div class="podium__name">${esc(firstName(top[i].full_name)||"—")}</div>
+        <div class="podium__score">${contest?`${top[i].score}/${top[i].total}`:`${top[i].best_pct}%`}</div>
+        <div class="podium__block">${medal(top[i].rank)}</div>
+      </div>`:"<div class='podium__col podium__col--empty'></div>").join("")}</div>`:"";
+  return `${podium}<table class="lb"><thead><tr><th>#</th><th>Name</th><th style="text-align:right">${contest?"Score":"Best"}</th><th style="text-align:right">${contest?"Time":"Runs"}</th></tr></thead><tbody>
+    ${rows.slice(0,limit).map(r=>`<tr class="${r.user_id===Auth.user.id?"lb__me":""}">
+      <td>${medal(r.rank)}</td><td>${esc(r.full_name||"—")}${r.user_id===Auth.user.id?` <span class="lb__you">you</span>`:""}</td>
+      <td style="text-align:right"><b>${contest?`${r.score}/${r.total}`:`${r.best_pct}%`}</b></td>
+      <td style="text-align:right" class="muted">${contest?fmtSecs(r.seconds_taken):r.attempts}</td></tr>`).join("")}
+    </tbody></table>
+    ${rows.length>limit?`<p class="muted" style="font-size:.8rem;margin:.5rem 0 0">…and ${rows.length-limit} more</p>`:""}`;
+}
+
+/* =========================================================== PRACTICE */
+function runPractice(mount,q,questions){
+  const back=()=>location.hash="#/quizzes";
+  if(!questions.length){ mount.innerHTML=`<button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>${emptyBlock("No questions yet","This quiz has no questions to answer.",I.quiz)}`; $("[data-back]").addEventListener("click",back); return; }
+  const SPEED=30; // seconds for a full speed bonus window
+  let idx=0, points=0, streak=0, bestStreak=0, correct=0, qStart=0;
+  const answers=new Array(questions.length).fill(null);
+
+  const intro=()=>{
+    QTimers.clear();
+    mount.innerHTML=`
+      <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
+      <div class="qplay qintro">
+        <div class="qintro__ic">🎮</div>
+        <h1>${esc(q.title)}</h1>
+        <p class="muted">${esc(q.description||"")}</p>
+        <div class="qintro__rules">
+          <div><b>${questions.length}</b><span>questions</span></div>
+          <div><b>100</b><span>points each</span></div>
+          <div><b>+50</b><span>speed bonus</span></div>
+          <div><b>🔥 ×1.5</b><span>streak boost</span></div>
+        </div>
+        <p class="muted" style="font-size:.85rem">Answer fast for a speed bonus. Keep a streak going to multiply your points. You'll see the right answer straight after each question.</p>
+        <button class="btn btn--primary" data-go style="min-width:200px">Start ▶</button>
+      </div>`;
+    $("[data-back]").addEventListener("click",back);
+    $("[data-go]").addEventListener("click",()=>{ idx=0;points=0;streak=0;bestStreak=0;correct=0;answers.fill(null); paintQ(); });
+  };
+
+  const paintQ=()=>{
+    QTimers.clear();
+    const qq=questions[idx]; qStart=Date.now();
+    mount.innerHTML=`
+      <div class="qhud">
+        <button class="btn btn--ghost btn--sm" data-quit>${I.back} Quit</button>
+        <div class="qhud__prog"><div style="width:${idx/questions.length*100}%"></div></div>
+        <div class="qhud__stat">Q <b>${idx+1}</b>/${questions.length}</div>
+        <div class="qhud__stat ${streak>=2?"hot":""}" data-streakbox>🔥 <b data-streak>${streak}</b></div>
+        <div class="qhud__stat">⭐ <b data-pts>${points}</b></div>
+      </div>
+      <div class="qplay">
+        <div class="qspeed"><div data-speed></div></div>
+        <div class="qprompt">${qfmt(qq.prompt)}</div>
+        <div class="qopts qopts--big">${(qq.options||[]).map((o,oi)=>`
+          <button class="qopt qopt--btn" data-opt="${oi}"><span class="qkey">${"ABCDEFGH"[oi]}</span><span>${qfmt(o)}</span></button>`).join("")}</div>
+        <div data-fb></div>
+      </div>`;
+    $("[data-quit]").addEventListener("click",()=>{ QTimers.clear(); intro(); });
+    const bar=$("[data-speed]");
+    QTimers.every(()=>{ const left=Math.max(0,1-(Date.now()-qStart)/1000/SPEED); if(bar) bar.style.width=(left*100)+"%"; },100);
+    mount.querySelectorAll("[data-opt]").forEach(b=>b.addEventListener("click",()=>choose(Number(b.dataset.opt))));
+    onKey=(e)=>{ const k=e.key.toUpperCase(); const i="ABCDEFGH".indexOf(k); if(i>=0 && i<(qq.options||[]).length && answers[idx]===null) choose(i); else if((e.key==="Enter"||e.key===" ") && answers[idx]!==null){ e.preventDefault(); $("[data-next]")?.click(); } };
+  };
+
+  const choose=(oi)=>{
+    if(answers[idx]!==null) return;
+    QTimers.clear();
+    const qq=questions[idx]; answers[idx]=oi;
+    const secs=(Date.now()-qStart)/1000;
+    const ok=oi===qq.correct_index;
+    let gained=0;
+    if(ok){
+      correct++; streak++; bestStreak=Math.max(bestStreak,streak);
+      const speed=Math.round(Math.max(0,1-secs/SPEED)*50);
+      const mult=Math.min(1.5,1+0.1*(streak-1));
+      gained=Math.round((100+speed)*mult); points+=gained;
+    } else streak=0;
+    mount.querySelectorAll("[data-opt]").forEach(b=>{
+      const i=Number(b.dataset.opt); b.disabled=true;
+      if(i===qq.correct_index) b.classList.add("right"); else if(i===oi) b.classList.add("wrong","shake");
+    });
+    $("[data-pts]").textContent=points;
+    $("[data-streak]").textContent=streak; $("[data-streakbox]").classList.toggle("hot",streak>=2);
+    const last=idx===questions.length-1;
+    $("[data-fb]").innerHTML=`
+      <div class="qfb ${ok?"qfb--ok":"qfb--no"}">
+        <div class="qfb__h">${ok?`✅ Correct! <span class="qfb__gain">+${gained}</span>${streak>=2?` <span class="qfb__streak">🔥 ${streak} in a row</span>`:""}`:"❌ Not quite"}</div>
+        ${qq.explanation?`<div class="qfb__why">${qfmt(qq.explanation)}</div>`:""}
+        <button class="btn btn--primary" data-next>${last?"See my results 🏁":"Next question →"}</button>
+      </div>`;
+    $("[data-next]").addEventListener("click",()=>{ if(last) finish(); else { idx++; paintQ(); } });
+    $("[data-next]").focus();
+  };
+
+  const finish=async()=>{
+    QTimers.clear(); onKey=null;
+    let score=0; questions.forEach((qq,i)=>{ if(answers[i]===qq.correct_index) score+=(qq.points||1); });
+    const total=questions.reduce((s,qq)=>s+(qq.points||1),0);
+    const pct=Math.round(score/total*100); const passed=pct>=(q.pass_pct||60);
+    const before=await db.myAttempts(Auth.user.id).catch(()=>[]);
+    const prevBest=Math.max(-1,...before.filter(a=>a.quiz_id===q.id).map(a=>a.pct));
+    try{ await db.saveAttempt({quiz_id:q.id,user_id:Auth.user.id,score,total,pct,passed,answers,submitted_at:new Date().toISOString()}); }catch(err){ toast("Couldn't save your score: "+(err.message||err),"err"); }
+    const st=starsFor(pct);
+    const msg= pct===100?"Flawless! 🏆": pct>=75?"Great run! 🎉": passed?"Passed — nice work 👍":"Keep going — you'll get there 💪";
+    mount.innerHTML=`
+      <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
+      <div class="hero qres">
+        <div class="kicker">${esc(q.title)}</div>
+        <div class="qres__stars">${starRow(st)}</div>
+        <h2>${pct}% <span class="qres__pts">· ${points} pts</span></h2>
+        <p>${msg} ${score} of ${total} correct · best streak 🔥 ${bestStreak}${prevBest>=0&&pct>prevBest?` · <b>New personal best!</b>`:""}</p>
+        <div style="display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap">
+          <button class="btn btn--primary" data-retry>Play again ↻</button>
+          <a class="btn btn--ghost qres__ghost" href="#/quizzes">More quizzes</a></div>
+      </div>
+      <div class="qres__grid">
+        <div><div class="section-h"><h2>🏆 Top scores</h2></div><div class="card card--pad" data-lb><div class="spinner"></div></div></div>
+        <div><div class="section-h"><h2>Review answers</h2></div>
+          <div class="stack">${questions.map((qq,i)=>{
+            const ok=answers[i]===qq.correct_index;
+            return `<div class="card card--pad">
+              <div style="font-weight:600;margin-bottom:.5rem">${ok?`<span class="teal">${I.check}</span>`:`<span class="flame">${I.alert}</span>`} Q${i+1}. ${qfmt(qq.prompt)}</div>
+              <div class="qopts">${(qq.options||[]).map((o,oi)=>{
+                let cls=""; if(oi===qq.correct_index) cls="right"; else if(oi===answers[i]) cls="wrong";
+                return `<div class="qopt review ${cls}"><span>${qfmt(o)}</span>${oi===qq.correct_index?`<b class="teal">correct</b>`:(oi===answers[i]?`<b class="flame">your answer</b>`:"")}</div>`;
+              }).join("")}</div>
+              ${qq.explanation?`<p class="muted" style="font-size:.85rem;margin:.6rem 0 0"><b>Why:</b> ${qfmt(qq.explanation)}</p>`:""}
+            </div>`;}).join("")}</div></div>
+      </div>`;
+    if(pct>=75) confetti();
+    $("[data-back]").addEventListener("click",back);
+    $("[data-retry]").addEventListener("click",intro);
+    db.practiceBoard(q.id).then(rows=>{ const b=$("[data-lb]"); if(b) b.innerHTML=boardHTML(rows,{limit:10}); }).catch(e=>{ const b=$("[data-lb]"); if(b) b.innerHTML=`<p class="muted">${esc(e.message)}</p>`; });
+  };
+
+  intro();
+}
+// one keyboard handler for the active practice screen
+let onKey=null;
+document.addEventListener("keydown",e=>{ if(onKey && !e.target.closest("input,textarea,select")) onKey(e); });
+window.addEventListener("hashchange",()=>{ onKey=null; });
+
+/* ============================================================ CONTEST */
+async function contestFlow(mount,q){
+  QTimers.clear();
+  const back=`<button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>`;
+  const wireBack=()=>$("[data-back]")?.addEventListener("click",()=>location.hash="#/quizzes");
+  const mine=(await db.myAttempts(Auth.user.id).catch(()=>[])).find(a=>a.quiz_id===q.id);
+  const st=contestState(q);
+  if(mine) return contestResult(mount,q,mine);
+
+  if(st==="upcoming"){
+    mount.innerHTML=`${back}
+      <div class="qplay qintro">
+        <div class="qintro__ic">⚔️</div>
+        <span class="cpill cpill--soon">UPCOMING</span>
+        <h1>${esc(q.title)}</h1>
+        <p class="muted">${esc(q.description||"")}</p>
+        <div class="bigclock" data-cd="${q.opens_at}">${fmtClock(new Date(q.opens_at)-Date.now())}</div>
+        <p class="muted">Opens at <b>${fmtTime(q.opens_at)}</b> · closes at <b>${fmtTime(q.closes_at)}</b> (${fmtDate(q.opens_at)})</p>
+        ${contestRules(q)}
+      </div>`;
+    wireBack();
+    QTimers.every(()=>{ const el=$("[data-cd]"); const ms=new Date(q.opens_at)-Date.now(); if(el) el.textContent=fmtClock(ms); if(ms<=0){ QTimers.clear(); contestFlow(mount,q); } },1000);
+    return;
+  }
+  if(st==="ended"){
+    return contestEnded(mount,q,null);
+  }
+  // live, not yet submitted
+  mount.innerHTML=`${back}
+    <div class="qplay qintro">
+      <div class="qintro__ic">⚔️</div>
+      <span class="cpill cpill--live"><i></i>LIVE NOW</span>
+      <h1>${esc(q.title)}</h1>
+      <p class="muted">${esc(q.description||"")}</p>
+      <div class="bigclock bigclock--sm">Closes in <b data-cd>${fmtClock(new Date(q.closes_at)-Date.now())}</b></div>
+      ${contestRules(q)}
+      <button class="btn btn--primary" data-start style="min-width:220px">Start contest ⚔️</button>
+    </div>`;
+  wireBack();
+  QTimers.every(()=>{ const el=$("[data-cd]"); const ms=new Date(q.closes_at)-Date.now(); if(el) el.textContent=fmtClock(ms); if(ms<=0){ QTimers.clear(); contestFlow(mount,q); } },1000);
+  $("[data-start]").addEventListener("click",async(e)=>{
+    e.target.disabled=true; e.target.textContent="Loading questions…";
+    try{ const data=await db.contestStart(q.id); contestPlay(mount,q,data); }
+    catch(err){ toast(err.message||String(err),"err"); e.target.disabled=false; e.target.textContent="Start contest ⚔️"; }
+  });
+}
+function contestRules(q){
+  return `<ul class="qrules">
+    <li>🎯 <b>One attempt only</b> — once you submit, it's final.</li>
+    <li>⏱️ Your time runs from when you press <b>Start</b>. Ties on score are broken by <b>time taken</b>.</li>
+    <li>🔀 Move freely between questions and change answers until you submit.</li>
+    <li>⏰ At ${q.closes_at?fmtTime(q.closes_at):"closing time"} your answers are <b>submitted automatically</b>.</li>
+    <li>🔒 Correct answers are revealed after the contest closes.</li></ul>`;
+}
+
+function contestPlay(mount,q,data){
+  QTimers.clear();
+  const qs=data.questions||[];
+  const offset=new Date(data.server_now||Date.now()).getTime()-Date.now(); // server clock − local clock
+  const closes=new Date(data.closes_at).getTime();
+  const now=()=>Date.now()+offset;
+  const key=`ascend-contest-${q.id}-${Auth.user.id}`;
+  let ans={}; try{ ans=JSON.parse(localStorage.getItem(key)||"{}")||{}; }catch(_){ ans={}; }
+  let idx=0, submitting=false;
+  const save=()=>{ try{ localStorage.setItem(key,JSON.stringify(ans)); }catch(_){} };
+
+  const submit=async(auto)=>{
+    if(submitting) return; submitting=true; QTimers.clear();
+    mount.innerHTML=`<div class="qplay qintro"><div class="spinner"></div><p class="muted">${auto?"Time's up — submitting your answers…":"Submitting…"}</p></div>`;
+    try{
+      await db.contestSubmit(q.id,ans);
+      try{ localStorage.removeItem(key); }catch(_){}
+      const mine=(await db.myAttempts(Auth.user.id).catch(()=>[])).find(a=>a.quiz_id===q.id);
+      confetti();
+      contestResult(mount,q,mine||{score:"?",total:qs.length},true);
+    }catch(err){
+      submitting=false; toast(err.message||String(err),"err");
+      if(/already submitted/i.test(err.message||"")) return contestFlow(mount,q);
+      paint(); armTimer();
+    }
+  };
+
+  const armTimer=()=>{
+    QTimers.every(()=>{
+      const left=closes-now();
+      const el=$("[data-left]"); if(el){ el.textContent=fmtClock(left); el.parentElement.classList.toggle("urgent",left<120000); }
+      if(left<=0) submit(true);
+    },500);
+  };
+
+  const paint=()=>{
+    const qq=qs[idx]; const answered=Object.keys(ans).filter(k=>ans[k]!==null&&ans[k]!==undefined).length;
+    mount.innerHTML=`
+      <div class="qhud qhud--contest">
+        <div class="qhud__title">⚔️ ${esc(q.title)}</div>
+        <div class="qhud__stat">Answered <b>${answered}</b>/${qs.length}</div>
+        <div class="qhud__clock">⏱️ <b data-left>${fmtClock(closes-now())}</b></div>
+      </div>
+      <div class="qpalette">${qs.map((x,i)=>`<button class="qdot ${ans[x.id]!=null?"done":""} ${i===idx?"cur":""}" data-go="${i}">${i+1}</button>`).join("")}</div>
+      <div class="qplay">
+        <div class="muted" style="font-size:.8rem;margin-bottom:.4rem">Question ${idx+1} of ${qs.length}</div>
+        <div class="qprompt">${qfmt(qq.prompt)}</div>
+        <div class="qopts qopts--big">${(qq.options||[]).map((o,oi)=>`
+          <button class="qopt qopt--btn ${ans[qq.id]===oi?"sel":""}" data-opt="${oi}"><span class="qkey">${"ABCDEFGH"[oi]}</span><span>${qfmt(o)}</span></button>`).join("")}</div>
+        <div class="qnav">
+          <button class="btn btn--ghost" data-prev ${idx===0?"disabled":""}>← Previous</button>
+          ${idx<qs.length-1?`<button class="btn btn--primary" data-next>Next →</button>`:`<button class="btn btn--primary" data-submit>Submit contest ✔</button>`}
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:.8rem"><button class="btn btn--ghost btn--sm" data-submit>Submit now (${answered}/${qs.length} answered)</button></div>`;
+    mount.querySelectorAll("[data-opt]").forEach(b=>b.addEventListener("click",()=>{ ans[qq.id]=Number(b.dataset.opt); save(); paint(); }));
+    mount.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>{ idx=Number(b.dataset.go); paint(); }));
+    $("[data-prev]")?.addEventListener("click",()=>{ if(idx>0){ idx--; paint(); } });
+    $("[data-next]")?.addEventListener("click",()=>{ if(idx<qs.length-1){ idx++; paint(); } });
+    mount.querySelectorAll("[data-submit]").forEach(b=>b.addEventListener("click",()=>{
+      const left=qs.length-Object.keys(ans).filter(k=>ans[k]!=null).length;
+      openModal({title:"Submit your answers?",bodyHTML:`<p class="muted" style="margin:0">${left?`<b class="flame">${left} question${left>1?"s are":" is"} unanswered.</b> `:""}You get <b>one attempt</b> — after submitting you can't change anything.</p>`,
+        footerHTML:`<button class="btn btn--ghost" data-cancel>Keep working</button><button class="btn btn--primary" data-yes>Submit</button>`});
+      $("[data-cancel]").addEventListener("click",closeModal);
+      $("[data-yes]").addEventListener("click",()=>{ closeModal(); submit(false); });
+    }));
+  };
+  paint(); armTimer();
+}
+
+async function contestResult(mount,q,mine,fresh){
+  QTimers.clear();
+  const st=contestState(q);
+  mount.innerHTML=`
+    <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
+    <div class="hero qres">
+      <div class="kicker">⚔️ ${esc(q.title)}</div>
+      <h2>${mine.score}/${mine.total} <span class="qres__pts" data-myrank></span></h2>
+      <p>${fresh?"Submitted! ":""}Time taken ${fmtSecs(mine.seconds_taken)}. ${st==="ended"?"The contest has closed — final standings below.":`The leaderboard updates live until ${fmtTime(q.closes_at)}. Answers are revealed after that.`}</p>
+    </div>
+    <div class="section-h"><h2>🏆 Leaderboard</h2><span class="muted" style="font-size:.8rem;margin-left:.5rem" data-lb-note></span></div>
+    <div class="card card--pad" data-lb><div class="spinner"></div></div>
+    <div data-review></div>`;
+  $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes");
+  const load=async()=>{
+    try{
+      const rows=await db.contestBoard(q.id);
+      const b=$("[data-lb]"); if(!b) return;
+      b.innerHTML=boardHTML(rows,{contest:true});
+      const me=rows.find(r=>r.user_id===Auth.user.id);
+      const rk=$("[data-myrank]"); if(rk&&me) rk.textContent=`· Rank #${me.rank} of ${rows.length}`;
+      const n=$("[data-lb-note]"); if(n) n.textContent=`${rows.length} submitted${contestState(q)!=="ended"?" · live":""}`;
+    }catch(e){ const b=$("[data-lb]"); if(b) b.innerHTML=`<p class="muted">${esc(e.message)}</p>`; }
+  };
+  await load();
+  if(st!=="ended"){
+    QTimers.every(load,15000);
+    QTimers.every(()=>{ if(contestState(q)==="ended"){ QTimers.clear(); contestResult(mount,q,mine); } },5000);
+  } else {
+    contestReview($("[data-review]"),q,mine.answers||{});
+  }
+}
+async function contestEnded(mount,q){
+  mount.innerHTML=`
+    <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
+    <div class="hero qres"><div class="kicker">⚔️ ${esc(q.title)}</div><h2>Contest closed</h2>
+      <p>This contest ran ${fmtDT(q.opens_at)} – ${fmtTime(q.closes_at)}. You didn't submit an entry — here are the final standings and the answers.</p></div>
+    <div class="section-h"><h2>🏆 Final leaderboard</h2></div>
+    <div class="card card--pad" data-lb><div class="spinner"></div></div>
+    <div data-review></div>`;
+  $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes");
+  try{ $("[data-lb]").innerHTML=boardHTML(await db.contestBoard(q.id),{contest:true}); }catch(e){ $("[data-lb]").innerHTML=`<p class="muted">${esc(e.message)}</p>`; }
+  contestReview($("[data-review]"),q,{});
+}
+async function contestReview(box,q,ans){
+  if(!box) return;
+  let questions=[]; try{ questions=await db.quizQuestions(q.id); }catch(_){}
+  if(!questions.length) return;
+  box.innerHTML=`<div class="section-h" style="margin-top:1.4rem"><h2>Answers</h2></div>
+    <div class="stack">${questions.map((qq,i)=>{
+      const a=ans[qq.id]; const ok=a===qq.correct_index;
+      return `<div class="card card--pad">
+        <div style="font-weight:600;margin-bottom:.5rem">${a==null?`<span class="muted">—</span>`:ok?`<span class="teal">${I.check}</span>`:`<span class="flame">${I.alert}</span>`} Q${i+1}. ${qfmt(qq.prompt)}</div>
+        <div class="qopts">${(qq.options||[]).map((o,oi)=>{
+          let cls=""; if(oi===qq.correct_index) cls="right"; else if(oi===a) cls="wrong";
+          return `<div class="qopt review ${cls}"><span>${qfmt(o)}</span>${oi===qq.correct_index?`<b class="teal">correct</b>`:(oi===a?`<b class="flame">your answer</b>`:"")}</div>`;
+        }).join("")}</div>
+        ${qq.explanation?`<p class="muted" style="font-size:.85rem;margin:.6rem 0 0"><b>Why:</b> ${qfmt(qq.explanation)}</p>`:""}
+      </div>`;}).join("")}</div>`;
+}
+
+/* ---- dashboard banner for a live / upcoming contest today ---- */
+function contestBannerHTML(quizzes){
+  const soon=quizzes.filter(q=>q.is_contest && contestState(q)!=="ended" && q.opens_at && new Date(q.opens_at)-Date.now()<24*3600e3)
+    .sort((a,b)=>new Date(a.opens_at)-new Date(b.opens_at))[0];
+  if(!soon) return "";
+  const live=contestState(soon)==="live";
+  return `<button class="cbanner ${live?"cbanner--live":""}" data-cbanner="${soon.id}">
+    <span class="cpill ${live?"cpill--live":"cpill--soon"}">${live?"<i></i>LIVE NOW":"TODAY"}</span>
+    <span class="cbanner__t">⚔️ ${esc(soon.title)}</span>
+    <span class="cbanner__w">${live?`closes ${fmtTime(soon.closes_at)}`:`${fmtTime(soon.opens_at)} – ${fmtTime(soon.closes_at)}`}</span>
+    <span class="btn btn--primary btn--sm">${live?"Enter":"Details"} ${I.chev}</span></button>`;
 }
 
 /* =============================================================== CAPSTONE */
@@ -2438,21 +2928,30 @@ async function editAssignment(a){
 }
 async function editQuiz(q){
   const courses=await db.courses();
-  formModal({title:q?"Edit quiz":"New quiz", submitLabel:q?"Save":"Create quiz",
+  formModal({title:q?"Edit quiz":"New quiz / contest", submitLabel:q?"Save":"Create", wide:true,
     fields:[
-      {name:"title",label:"Quiz title",required:true,placeholder:"Git basics — quick check"},
-      {name:"description",label:"Description",type:"textarea",placeholder:"A short line about what it covers."},
-      {row:[{name:"course_id",label:"Course",type:"select",options:[{value:"",label:"— General —"},...courses.map(c=>({value:c.id,label:c.title}))]},
-            {name:"pass_pct",label:"Pass mark (%)",type:"number",placeholder:"60"}]},
-    ], values:q?{...q}:{pass_pct:60,course_id:""},
-    onSubmit:async(d)=>{ if(!d.course_id) d.course_id=null; d.pass_pct=d.pass_pct||60;
-      if(q){ await db.update("quizzes",q.id,d); toast("Quiz saved"); render(); }
-      else{ const created=await db.create("quizzes",{...d,is_published:true,sort_order:Date.now()}); toast("Quiz created — now add questions"); location.hash=`#/quiz/${created.id}`; } }});
+      {name:"title",label:"Title",required:true,placeholder:"NumPy filtering — quick check"},
+      {name:"description",label:"Description",type:"textarea",rows:2,placeholder:"A short line about what it covers."},
+      {row:[{name:"mode",label:"Type",type:"select",options:[{value:"practice",label:"Practice quiz"},{value:"contest",label:"Live contest"}]},
+            {name:"course_id",label:"Course",type:"select",options:[{value:"",label:"— General —"},...courses.map(c=>({value:c.id,label:c.title}))]}]},
+      {row:[{name:"opens_at",label:"Contest opens",type:"datetime",hint:"contests only"},
+            {name:"closes_at",label:"Contest closes",type:"datetime",hint:"contests only"}]},
+      {name:"pass_pct",label:"Pass mark (%)",type:"number",placeholder:"60"},
+    ], values:q?{...q,mode:q.is_contest?"contest":"practice"}:{pass_pct:60,course_id:"",mode:"practice"},
+    onSubmit:async(d)=>{
+      if(!d.course_id) d.course_id=null; d.pass_pct=d.pass_pct||60;
+      d.is_contest=d.mode==="contest"; delete d.mode;
+      if(d.is_contest){
+        if(!d.opens_at||!d.closes_at) throw new Error("A contest needs both an opening and a closing time");
+        if(new Date(d.closes_at)<=new Date(d.opens_at)) throw new Error("Closing time must be after opening time");
+      } else { d.opens_at=null; d.closes_at=null; }
+      if(q){ await db.update("quizzes",q.id,d); toast("Saved"); render(); }
+      else{ const created=await db.create("quizzes",{...d,is_published:true,sort_order:Date.now()}); toast("Created — now add questions"); location.hash=`#/quiz/${created.id}`; } }});
 }
 function editQuestion(quizId,qq,count){
   const opts=(qq?.options||["","","",""]);
   const body=`<form data-form>
-    <div class="field"><label>Question</label><textarea name="prompt" placeholder="Which command creates a new branch?">${esc(qq?.prompt||"")}</textarea></div>
+    <div class="field"><label>Question <span class="hint">wrap code in \`backticks\`; indent lines 4 spaces for a code block</span></label><textarea name="prompt" rows="5" placeholder="Which command creates a new branch?">${esc(qq?.prompt||"")}</textarea></div>
     <div class="field"><label>Answer options <span class="hint">tick the correct one</span></label>
       ${[0,1,2,3].map(i=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
         <input type="radio" name="correct" value="${i}" ${((qq?.correct_index)??0)===i?"checked":""}/>
