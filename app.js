@@ -218,7 +218,7 @@ const DemoStore = (() => {
   ];
   // demo live contest: opened a minute ago, closes in 29 minutes
   const _n=Date.now();
-  quizzes.push({id:"qzc",course_id:"c2",title:"Live contest — Python warm-up",description:"10-minute demo contest.",pass_pct:60,is_published:true,sort_order:0,is_contest:true,opens_at:new Date(_n-60e3).toISOString(),closes_at:new Date(_n+29*60e3).toISOString()});
+  quizzes.push({id:"qzc",course_id:"c2",title:"Live contest — Python warm-up",description:"10-minute demo contest.",pass_pct:60,is_published:true,sort_order:0,is_contest:true,opens_at:new Date(_n-60e3).toISOString(),closes_at:new Date(_n+29*60e3).toISOString(),duration_mins:10});
   quiz_questions.push(
     {id:"qc1",quiz_id:"qzc",prompt:"What does `len([1,2,3])` return?",options:["2","3","[1,2,3]","Error"],correct_index:1,explanation:"len counts the items.",points:1,sort_order:1},
     {id:"qc2",quiz_id:"qzc",prompt:"What is printed?\n\n    x = [1,2,3]\n    print(x[-1])",options:["1","3","-1","Error"],correct_index:1,explanation:"Index -1 is the last item.",points:1,sort_order:2});
@@ -228,10 +228,12 @@ const DemoStore = (() => {
     const z=quizzes.find(q=>q.id===qid); const me=Auth.user.id; const k=qid+"|"+me;
     if(new Date()>=new Date(z.closes_at)) throw new Error("Contest is closed");
     if(entries[k]?.submitted) throw new Error("You have already submitted this contest");
-    entries[k]=entries[k]||{started_at:new Date().toISOString(),submitted:false};
-    return {started_at:entries[k].started_at,closes_at:z.closes_at,server_now:new Date().toISOString(),
+    entries[k]=entries[k]||{started_at:new Date().toISOString(),submitted:false,draft:{}};
+    const dl=Math.min(new Date(z.closes_at).getTime(), z.duration_mins? new Date(entries[k].started_at).getTime()+z.duration_mins*60e3 : Infinity);
+    return {started_at:entries[k].started_at,closes_at:z.closes_at,deadline:new Date(dl).toISOString(),duration_mins:z.duration_mins,draft:entries[k].draft,server_now:new Date().toISOString(),
       questions:quiz_questions.filter(x=>x.quiz_id===qid).sort((a,b)=>a.sort_order-b.sort_order).map(({id,prompt,options,points})=>({id,prompt,options,points}))};
   };
+  const contestSave=(qid,ans)=>{ const e=entries[qid+"|"+Auth.user.id]; if(e&&!e.submitted) e.draft={...ans}; };
   const contestSubmit=(qid,ans)=>{
     const me=Auth.user.id; const k=qid+"|"+me; const e=entries[k];
     if(!e) throw new Error("Start the contest first"); if(e.submitted) throw new Error("You have already submitted this contest");
@@ -246,7 +248,9 @@ const DemoStore = (() => {
   const practiceBoard=(qid)=>{ const m={}; quiz_attempts.filter(a=>a.quiz_id===qid).forEach(a=>{ const x=m[a.user_id]||(m[a.user_id]={user_id:a.user_id,full_name:name(a.user_id),best_pct:0,attempts:0}); x.best_pct=Math.max(x.best_pct,a.pct); x.attempts++; });
     return rankRows(Object.values(m),(a,b)=>(b.best_pct-a.best_pct)||(a.attempts-b.attempts)).slice(0,20); };
   quiz_attempts.push({id:"atc",quiz_id:"qzc",user_id:"u-3",score:1,total:2,pct:50,passed:false,answers:{qc1:1,qc2:0},submitted_at:new Date().toISOString(),seconds_taken:95});
-  return {uid,courses,sessions,materials,notes,assignments,profiles,submissions,quizzes,quiz_questions,quiz_attempts,capstones,capstone_submissions,threads,thread_replies,contestStart,contestSubmit,contestBoard,practiceBoard};
+  return {uid,courses,sessions,materials,notes,assignments,profiles,submissions,quizzes,quiz_questions,quiz_attempts,capstones,capstone_submissions,threads,thread_replies,contestStart,contestSave,contestSubmit,contestBoard,practiceBoard,overallBoard:()=>{ const cids=new Set(quizzes.filter(q=>q.is_contest).map(q=>q.id)); const m={};
+    quiz_attempts.filter(a=>cids.has(a.quiz_id)).forEach(a=>{ const x=m[a.user_id]||(m[a.user_id]={user_id:a.user_id,full_name:name(a.user_id),contests:0,score:0,total:0,seconds_taken:0}); x.contests++; x.score+=a.score; x.total+=a.total; x.seconds_taken+=a.seconds_taken||0; });
+    return rankRows(Object.values(m),(a,b)=>(b.score-a.score)||(a.seconds_taken-b.seconds_taken)); }};
 })();
 
 /* ---- unified data API ---- */
@@ -385,9 +389,17 @@ const db = {
     if(DEMO) return DemoStore.contestSubmit(qid,ans);
     const {data,error}=await sb.rpc("contest_submit",{qid,ans}); if(error) throw error; return data;
   },
+  async contestSave(qid,ans){
+    if(DEMO) return DemoStore.contestSave(qid,ans);
+    const {error}=await sb.rpc("contest_save",{qid,ans}); if(error) throw error;
+  },
   async contestBoard(qid){
     if(DEMO) return DemoStore.contestBoard(qid);
     const {data,error}=await sb.rpc("contest_leaderboard",{qid}); if(error) throw error; return data||[];
+  },
+  async overallBoard(){
+    if(DEMO) return DemoStore.overallBoard();
+    const {data,error}=await sb.rpc("contest_overall_leaderboard"); if(error) throw error; return data||[];
   },
   async practiceBoard(qid){
     if(DEMO) return DemoStore.practiceBoard(qid);
@@ -554,7 +566,7 @@ async function render(){
       dashboard:viewDashboard, courses:viewCourses, course:viewCourse,
       notes:viewNotes, note:viewNote, prereq:viewPrereq,
       assignments:viewAssignments, assignment:viewAssignment,
-      quizzes:viewQuizzes, quiz:viewQuiz,
+      quizzes:viewQuizzes, quiz:viewQuiz, leaderboard:viewLeaderboard,
       playground:viewPlayground,
       capstone:viewCapstone,
       schedule:viewSchedule, recordings:viewRecordings, session:viewSession,
@@ -678,6 +690,7 @@ function navForRole(){
     {name:"notes",label:"Faculty notes",icon:I.note},
     {name:"assignments",label:"Assignments",icon:I.clip},
     {name:"quizzes",label:"Quizzes & contests",icon:I.quiz},
+    {name:"leaderboard",label:"Leaderboard",icon:I.trophy},
     {name:"playground",label:"Python playground",icon:I.git},
     {name:"capstone",label:"Capstone project",icon:I.rocket},
     {name:"forum",label:"Discussion forum",icon:I.chat},
@@ -1865,7 +1878,7 @@ async function viewQuizzes(mount){
       <div class="contest__top">${pill}<span class="contest__when">${fmtDate(q.opens_at)} · ${q.opens_at?fmtTime(q.opens_at):""}${q.closes_at?" – "+fmtTime(q.closes_at):""}</span></div>
       <h3>⚔️ ${esc(q.title)}</h3>
       <p>${esc(q.description||"")}</p>
-      <div class="contest__foot"><span>${timer}</span>
+      <div class="contest__foot">${q.duration_mins?`<span class="contest__dur">⏱️ ${q.duration_mins}-min test</span>`:""}<span>${timer}</span>
         ${mine?`<span class="contest__mine">Your score: <b>${mine.score}/${mine.total}</b></span>`:""}
         <span class="btn btn--primary btn--sm">${cta} ${I.chev}</span></div>
     </button>`;
@@ -1883,6 +1896,11 @@ async function viewQuizzes(mount){
 
     ${activeC.length?`<div class="section-h"><h2>Live &amp; upcoming contests</h2><span class="count">${activeC.length}</span></div>
       <div class="stack" style="margin-bottom:1.6rem">${activeC.map(contestCard).join("")}</div>`:""}
+
+    ${contests.length?`<a class="cbanner" href="#/leaderboard" style="text-decoration:none;margin-bottom:1.6rem">
+      <span style="font-size:1.4rem">🏆</span><span class="cbanner__t">Leaderboard</span>
+      <span class="cbanner__w">Overall standings across all ${contests.length} contest${contests.length>1?"s":""} · results of each contest</span>
+      <span class="btn btn--primary btn--sm">Open ${I.chev}</span></a>`:""}
 
     <div class="section-h"><h2>Practice quizzes</h2><span class="count">${practice.length}</span></div>
     <div class="grid">${practice.map(q=>{
@@ -1937,7 +1955,7 @@ async function manageQuiz(mount,q){
     <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
     <div class="page-h"><div><h1>${q.is_contest?"⚔️ ":""}${esc(q.title)}</h1>
       <p>${esc(q.description||"")}${q.is_contest
-        ?` · <b>Live contest</b> ${fmtDT(q.opens_at)} – ${q.closes_at?fmtTime(q.closes_at):"?"} · <span class="cpill cpill--${st==="live"?"live":st==="upcoming"?"soon":"done"}">${st==="live"?"<i></i>":""}${st.toUpperCase()}</span>`
+        ?` · <b>Live contest</b> ${fmtDT(q.opens_at)} – ${q.closes_at?fmtTime(q.closes_at):"?"}${q.duration_mins?` · ${q.duration_mins} min each`:""} · <span class="cpill cpill--${st==="live"?"live":st==="upcoming"?"soon":"done"}">${st==="live"?"<i></i>":""}${st.toUpperCase()}</span>`
         :` · Practice · pass mark ${q.pass_pct}%`}</p></div>
       <div style="display:flex;gap:.5rem">
         <button class="btn btn--ghost btn--sm" data-edit-quiz>${I.edit} Edit</button>
@@ -1972,7 +1990,8 @@ async function manageQuiz(mount,q){
 }
 
 /* ---- leaderboard table ---- */
-function boardHTML(rows,{contest=false,limit=50}={}){
+function boardHTML(rows,{contest=false,overall=false,limit=50}={}){
+  if(overall) contest=true;
   if(!rows.length) return `<p class="muted" style="margin:0">No entries yet — be the first on the board.</p>`;
   const medal=r=>r===1?"🥇":r===2?"🥈":r===3?"🥉":`<span class="lb__n">${r}</span>`;
   const top=rows.filter(r=>r.rank<=3).slice(0,3);
@@ -1982,10 +2001,10 @@ function boardHTML(rows,{contest=false,limit=50}={}){
         <div class="podium__score">${contest?`${top[i].score}/${top[i].total}`:`${top[i].best_pct}%`}</div>
         <div class="podium__block">${medal(top[i].rank)}</div>
       </div>`:"<div class='podium__col podium__col--empty'></div>").join("")}</div>`:"";
-  return `${podium}<table class="lb"><thead><tr><th>#</th><th>Name</th><th style="text-align:right">${contest?"Score":"Best"}</th><th style="text-align:right">${contest?"Time":"Runs"}</th></tr></thead><tbody>
+  return `${podium}<table class="lb"><thead><tr><th>#</th><th>Name</th>${overall?`<th style="text-align:right">Contests</th>`:""}<th style="text-align:right">${overall?"Total score":contest?"Score":"Best"}</th><th style="text-align:right">${overall?"Total time":contest?"Time":"Runs"}</th></tr></thead><tbody>
     ${rows.slice(0,limit).map(r=>`<tr class="${r.user_id===Auth.user.id?"lb__me":""}">
       <td>${medal(r.rank)}</td><td>${esc(r.full_name||"—")}${r.user_id===Auth.user.id?` <span class="lb__you">you</span>`:""}</td>
-      <td style="text-align:right"><b>${contest?`${r.score}/${r.total}`:`${r.best_pct}%`}</b></td>
+      ${overall?`<td style="text-align:right" class="muted">${r.contests}</td>`:""}<td style="text-align:right"><b>${contest?`${r.score}/${r.total}`:`${r.best_pct}%`}</b></td>
       <td style="text-align:right" class="muted">${contest?fmtSecs(r.seconds_taken):r.attempts}</td></tr>`).join("")}
     </tbody></table>
     ${rows.length>limit?`<p class="muted" style="font-size:.8rem;margin:.5rem 0 0">…and ${rows.length-limit} more</p>`:""}`;
@@ -2148,6 +2167,10 @@ async function contestFlow(mount,q){
     return;
   }
   if(st==="ended"){
+    // the leaderboard call marks anyone whose time ran out; then look again
+    await db.contestBoard(q.id).catch(()=>{});
+    const late=(await db.myAttempts(Auth.user.id).catch(()=>[])).find(a=>a.quiz_id===q.id);
+    if(late) return contestResult(mount,q,late);
     return contestEnded(mount,q,null);
   }
   // live, not yet submitted
@@ -2157,24 +2180,32 @@ async function contestFlow(mount,q){
       <span class="cpill cpill--live"><i></i>LIVE NOW</span>
       <h1>${esc(q.title)}</h1>
       <p class="muted">${esc(q.description||"")}</p>
-      <div class="bigclock bigclock--sm">Closes in <b data-cd>${fmtClock(new Date(q.closes_at)-Date.now())}</b></div>
+      ${q.duration_mins?`<div class="bigclock">${q.duration_mins}:00</div><p class="muted" style="margin-top:-.4rem">minutes on your clock once you press Start</p>`:""}
+      <div class="bigclock bigclock--sm">Window closes in <b data-cd>${fmtClock(new Date(q.closes_at)-Date.now())}</b></div>
+      <div data-short></div>
       ${contestRules(q)}
-      <button class="btn btn--primary" data-start style="min-width:220px">Start contest ⚔️</button>
+      <button class="btn btn--primary" data-start style="min-width:220px">Start my ${q.duration_mins?q.duration_mins+"-minute ":""}test ⚔️</button>
     </div>`;
   wireBack();
-  QTimers.every(()=>{ const el=$("[data-cd]"); const ms=new Date(q.closes_at)-Date.now(); if(el) el.textContent=fmtClock(ms); if(ms<=0){ QTimers.clear(); contestFlow(mount,q); } },1000);
+  const shortWarn=()=>{ const ms=new Date(q.closes_at)-Date.now(); const el=$("[data-short]");
+    if(el && q.duration_mins && ms<q.duration_mins*60e3) el.innerHTML=`<p class="flame" style="font-weight:600;margin:.2rem 0">⚠️ Only ${Math.max(0,Math.floor(ms/60e3))} min left in the window — your test will end at ${fmtTime(q.closes_at)}.</p>`; };
+  shortWarn();
+  QTimers.every(()=>{ const el=$("[data-cd]"); const ms=new Date(q.closes_at)-Date.now(); if(el) el.textContent=fmtClock(ms); shortWarn(); if(ms<=0){ QTimers.clear(); contestFlow(mount,q); } },1000);
   $("[data-start]").addEventListener("click",async(e)=>{
-    e.target.disabled=true; e.target.textContent="Loading questions…";
+    const label=e.target.textContent; e.target.disabled=true; e.target.textContent="Loading questions…";
     try{ const data=await db.contestStart(q.id); contestPlay(mount,q,data); }
-    catch(err){ toast(err.message||String(err),"err"); e.target.disabled=false; e.target.textContent="Start contest ⚔️"; }
+    catch(err){ toast(err.message||String(err),"err"); if(/time is over|already submitted/i.test(err.message||"")) return contestFlow(mount,q); e.target.disabled=false; e.target.textContent=label; }
   });
 }
 function contestRules(q){
   return `<ul class="qrules">
     <li>🎯 <b>One attempt only</b> — once you submit, it's final.</li>
-    <li>⏱️ Your time runs from when you press <b>Start</b>. Ties on score are broken by <b>time taken</b>.</li>
-    <li>🔀 Move freely between questions and change answers until you submit.</li>
-    <li>⏰ At ${q.closes_at?fmtTime(q.closes_at):"closing time"} your answers are <b>submitted automatically</b>.</li>
+    ${q.duration_mins
+      ?`<li>⏱️ Start any time between <b>${q.opens_at?fmtTime(q.opens_at):"opening"}</b> and <b>${q.closes_at?fmtTime(q.closes_at):"closing"}</b>. You get <b>${q.duration_mins} minutes</b> from the moment you press Start (less if you start close to ${q.closes_at?fmtTime(q.closes_at):"closing time"}).</li>`
+      :`<li>⏱️ Your time runs from when you press <b>Start</b>.</li>`}
+    <li>🏁 Ranked by <b>score</b>; ties are broken by <b>time taken</b>.</li>
+    <li>🔀 Move freely between questions and change answers until you submit. Answers are <b>saved as you go</b> — if your connection drops, sign back in and carry on.</li>
+    <li>⏰ When your time runs out, your saved answers are <b>submitted automatically</b>.</li>
     <li>🔒 Correct answers are revealed after the contest closes.</li></ul>`;
 }
 
@@ -2182,12 +2213,13 @@ function contestPlay(mount,q,data){
   QTimers.clear();
   const qs=data.questions||[];
   const offset=new Date(data.server_now||Date.now()).getTime()-Date.now(); // server clock − local clock
-  const closes=new Date(data.closes_at).getTime();
+  const closes=new Date(data.deadline||data.closes_at).getTime(); // this person's deadline
   const now=()=>Date.now()+offset;
   const key=`ascend-contest-${q.id}-${Auth.user.id}`;
-  let ans={}; try{ ans=JSON.parse(localStorage.getItem(key)||"{}")||{}; }catch(_){ ans={}; }
-  let idx=0, submitting=false;
-  const save=()=>{ try{ localStorage.setItem(key,JSON.stringify(ans)); }catch(_){} };
+  let ans={...(data.draft||{})}; try{ ans={...ans,...(JSON.parse(localStorage.getItem(key)||"{}")||{})}; }catch(_){}
+  let idx=0, submitting=false, saveT=null;
+  const save=()=>{ try{ localStorage.setItem(key,JSON.stringify(ans)); }catch(_){}
+    clearTimeout(saveT); saveT=setTimeout(()=>db.contestSave(q.id,ans).catch(()=>{}),600); };
 
   const submit=async(auto)=>{
     if(submitting) return; submitting=true; QTimers.clear();
@@ -2260,6 +2292,7 @@ async function contestResult(mount,q,mine,fresh){
     </div>
     <div class="section-h"><h2>🏆 Leaderboard</h2><span class="muted" style="font-size:.8rem;margin-left:.5rem" data-lb-note></span></div>
     <div class="card card--pad" data-lb><div class="spinner"></div></div>
+    <p class="muted" style="font-size:.85rem;margin:.6rem 0 0">Overall standings across all contests are on the <a href="#/leaderboard">Leaderboard</a> page.</p>
     <div data-review></div>`;
   $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes");
   const load=async()=>{
@@ -2307,6 +2340,47 @@ async function contestReview(box,q,ans){
         }).join("")}</div>
         ${qq.explanation?`<p class="muted" style="font-size:.85rem;margin:.6rem 0 0"><b>Why:</b> ${qfmt(qq.explanation)}</p>`:""}
       </div>`;}).join("")}</div>`;
+}
+
+/* ========================================================= LEADERBOARD */
+async function viewLeaderboard(mount,r){
+  const quizzes=await db.quizzes();
+  const contests=quizzes.filter(q=>q.is_contest && contestState(q)!=="upcoming").sort((a,b)=>new Date(b.opens_at||0)-new Date(a.opens_at||0));
+  const sel=r.id||"overall";
+  const cur=contests.find(c=>c.id===sel);
+  mount.innerHTML=`
+    <div class="page-h"><div><h1>🏆 Leaderboard</h1><p>Overall standings across every contest, plus the result of each one.</p></div>
+      ${Auth.canManage?`<button class="btn btn--ghost btn--sm" data-csv>${I.inbox} Download CSV</button>`:""}</div>
+    ${contests.length?`<div class="lbtabs">
+      <a href="#/leaderboard" class="${sel==="overall"?"on":""}">⭐ Overall</a>
+      ${contests.map((c,i)=>`<a href="#/leaderboard/${c.id}" class="${sel===c.id?"on":""}">${contestState(c)==="live"?`<span class="cpill cpill--live" style="padding:.1rem .4rem"><i></i></span> `:""}${fmtDate(c.opens_at)} · ${esc(c.title.replace(/^Live Contest — /,""))}</a>`).join("")}
+    </div>`:""}
+    <div class="card card--pad" data-board><div class="spinner"></div></div>
+    <p class="muted" style="font-size:.82rem;margin:.6rem 0 0" data-note></p>`;
+  if(!contests.length){ $("[data-board]").innerHTML=`<p class="muted" style="margin:0">No contests have run yet.</p>`; return; }
+  let rows=[];
+  const load=async()=>{
+    try{
+      rows = cur ? await db.contestBoard(cur.id) : await db.overallBoard();
+      const b=$("[data-board]"); if(!b) return;
+      b.innerHTML = cur
+        ? `<div class="lbhead"><h2>${esc(cur.title)}</h2><span class="muted">${fmtDT(cur.opens_at)} – ${fmtTime(cur.closes_at)} · ${rows.length} took part</span></div>${boardHTML(rows,{contest:true,limit:500})}`
+        : `<div class="lbhead"><h2>Overall standings</h2><span class="muted">${contests.length} contest${contests.length>1?"s":""} · ${rows.length} participants</span></div>${boardHTML(rows,{overall:true,limit:500})}`;
+      const n=$("[data-note]"); if(n) n.textContent = (cur
+        ? "Ranked by score, then by time taken."
+        : "Ranked by total score across all contests, then by total time taken. Missing a contest counts as 0 for that contest.")
+        + (cur&&contestState(cur)==="live" ? " · Live — refreshes every 15 s." : "");
+    }catch(e){ const b=$("[data-board]"); if(b) b.innerHTML=`<p class="muted">${esc(e.message)}</p>`; }
+  };
+  await load();
+  if(cur && contestState(cur)==="live") QTimers.every(load,15000);
+  $("[data-csv]")?.addEventListener("click",()=>{
+    const head = cur ? ["Rank","Name","Score","Out of","Time (s)"] : ["Rank","Name","Contests","Total score","Out of","Total time (s)"];
+    const body = rows.map(x=> cur ? [x.rank,x.full_name,x.score,x.total,x.seconds_taken] : [x.rank,x.full_name,x.contests,x.score,x.total,x.seconds_taken]);
+    const csv=[head,...body].map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+    a.download=(cur?cur.title:"Overall leaderboard").replace(/[^a-z0-9]+/gi,"_")+".csv"; a.click();
+  });
 }
 
 /* ---- dashboard banner for a live / upcoming contest today ---- */
@@ -2934,9 +3008,10 @@ async function editQuiz(q){
       {name:"description",label:"Description",type:"textarea",rows:2,placeholder:"A short line about what it covers."},
       {row:[{name:"mode",label:"Type",type:"select",options:[{value:"practice",label:"Practice quiz"},{value:"contest",label:"Live contest"}]},
             {name:"course_id",label:"Course",type:"select",options:[{value:"",label:"— General —"},...courses.map(c=>({value:c.id,label:c.title}))]}]},
-      {row:[{name:"opens_at",label:"Contest opens",type:"datetime",hint:"contests only"},
-            {name:"closes_at",label:"Contest closes",type:"datetime",hint:"contests only"}]},
-      {name:"pass_pct",label:"Pass mark (%)",type:"number",placeholder:"60"},
+      {row:[{name:"opens_at",label:"Window opens",type:"datetime",hint:"contests only"},
+            {name:"closes_at",label:"Window closes",type:"datetime",hint:"contests only"}]},
+      {row:[{name:"duration_mins",label:"Time per person (minutes)",type:"number",placeholder:"10",hint:"blank = until window closes"},
+            {name:"pass_pct",label:"Pass mark (%)",type:"number",placeholder:"60"}]},
     ], values:q?{...q,mode:q.is_contest?"contest":"practice"}:{pass_pct:60,course_id:"",mode:"practice"},
     onSubmit:async(d)=>{
       if(!d.course_id) d.course_id=null; d.pass_pct=d.pass_pct||60;
@@ -2944,7 +3019,8 @@ async function editQuiz(q){
       if(d.is_contest){
         if(!d.opens_at||!d.closes_at) throw new Error("A contest needs both an opening and a closing time");
         if(new Date(d.closes_at)<=new Date(d.opens_at)) throw new Error("Closing time must be after opening time");
-      } else { d.opens_at=null; d.closes_at=null; }
+        if(d.duration_mins!=null && d.duration_mins<=0) d.duration_mins=null;
+      } else { d.opens_at=null; d.closes_at=null; d.duration_mins=null; }
       if(q){ await db.update("quizzes",q.id,d); toast("Saved"); render(); }
       else{ const created=await db.create("quizzes",{...d,is_published:true,sort_order:Date.now()}); toast("Created — now add questions"); location.hash=`#/quiz/${created.id}`; } }});
 }
