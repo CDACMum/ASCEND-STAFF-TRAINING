@@ -216,7 +216,6 @@ const DemoStore = (() => {
     {id:"rep2",thread_id:"th1",author_id:"u-2",body:"Switched to HTTPS and it worked. Thanks!",is_answer:false,created_at:"2026-09-05T11:00:00+05:30"},
     {id:"rep3",thread_id:"th2",author_id:"u-trainer",body:"Yes — Git, Google Drive or a recording link all work. At least one is required.",is_answer:true,created_at:"2026-09-06T10:30:00+05:30"},
   ];
-<<<<<<< HEAD
   // demo live contest: opened a minute ago, closes in 29 minutes
   const _n=Date.now();
   quizzes.push({id:"qzc",course_id:"c2",title:"Live contest — Python warm-up",description:"10-minute demo contest.",pass_pct:60,is_published:true,sort_order:0,is_contest:true,opens_at:new Date(_n-60e3).toISOString(),closes_at:new Date(_n+29*60e3).toISOString(),duration_mins:10});
@@ -252,9 +251,6 @@ const DemoStore = (() => {
   return {uid,courses,sessions,materials,notes,assignments,profiles,submissions,quizzes,quiz_questions,quiz_attempts,capstones,capstone_submissions,threads,thread_replies,contestStart,contestSave,contestSubmit,contestBoard,practiceBoard,overallBoard:()=>{ const cids=new Set(quizzes.filter(q=>q.is_contest).map(q=>q.id)); const m={};
     quiz_attempts.filter(a=>cids.has(a.quiz_id)).forEach(a=>{ const x=m[a.user_id]||(m[a.user_id]={user_id:a.user_id,full_name:name(a.user_id),contests:0,score:0,total:0,seconds_taken:0}); x.contests++; x.score+=a.score; x.total+=a.total; x.seconds_taken+=a.seconds_taken||0; });
     return rankRows(Object.values(m),(a,b)=>(b.score-a.score)||(a.seconds_taken-b.seconds_taken)); }};
-=======
-  return {uid,courses,sessions,materials,notes,assignments,profiles,submissions,quizzes,quiz_questions,quiz_attempts,capstones,capstone_submissions,threads,thread_replies};
->>>>>>> origin/main
 })();
 
 /* ---- unified data API ---- */
@@ -384,7 +380,6 @@ const db = {
     const {data,error}=await sb.from("quiz_attempts").insert(row).select().single();
     if(error) throw error; return data;
   },
-<<<<<<< HEAD
   /* ---- live contests & boards ---- */
   async contestStart(qid){
     if(DEMO) return DemoStore.contestStart(qid);
@@ -410,8 +405,6 @@ const db = {
     if(DEMO) return DemoStore.practiceBoard(qid);
     const {data,error}=await sb.rpc("practice_leaderboard",{qid}); if(error) throw error; return data||[];
   },
-=======
->>>>>>> origin/main
   /* ---- capstone ---- */
   async capstones(){
     if(DEMO) return [...DemoStore.capstones].sort((a,b)=>a.sort_order-b.sort_order);
@@ -559,10 +552,7 @@ function route(){
 
 /* ============================================================ RENDER */
 async function render(){
-<<<<<<< HEAD
   QTimers.clear();
-=======
->>>>>>> origin/main
   const root=$("#root");
   if(!Auth.user){ renderAuth(root); return; }
   if(!Auth.profile){ try{ Auth.profile=await db.profile(Auth.user.id);}catch{} }
@@ -576,11 +566,7 @@ async function render(){
       dashboard:viewDashboard, courses:viewCourses, course:viewCourse,
       notes:viewNotes, note:viewNote, prereq:viewPrereq,
       assignments:viewAssignments, assignment:viewAssignment,
-<<<<<<< HEAD
       quizzes:viewQuizzes, quiz:viewQuiz, leaderboard:viewLeaderboard,
-=======
-      quizzes:viewQuizzes, quiz:viewQuiz,
->>>>>>> origin/main
       playground:viewPlayground,
       capstone:viewCapstone,
       schedule:viewSchedule, recordings:viewRecordings, session:viewSession,
@@ -703,12 +689,8 @@ function navForRole(){
     {name:"prereq",label:"Prerequisites",icon:I.book},
     {name:"notes",label:"Faculty notes",icon:I.note},
     {name:"assignments",label:"Assignments",icon:I.clip},
-<<<<<<< HEAD
     {name:"quizzes",label:"Quizzes & contests",icon:I.quiz},
     {name:"leaderboard",label:"Leaderboard",icon:I.trophy},
-=======
-    {name:"quizzes",label:"Practice quizzes",icon:I.quiz},
->>>>>>> origin/main
     {name:"playground",label:"Python playground",icon:I.git},
     {name:"capstone",label:"Capstone project",icon:I.rocket},
     {name:"forum",label:"Discussion forum",icon:I.chat},
@@ -855,11 +837,8 @@ async function dashStaff(mount){
   wireCourseOpen(mount);
   mount.querySelectorAll("[data-open-assign]").forEach(el=>el.addEventListener("click",()=>location.hash=`#/assignment/${el.dataset.openAssign}`));
   $("[data-cap]")?.addEventListener("click",()=>location.hash="#/capstone");
-<<<<<<< HEAD
   const _cb=contestBannerHTML(quizzes);
   if(_cb){ mount.insertAdjacentHTML("afterbegin",_cb); $("[data-cbanner]").addEventListener("click",e=>location.hash=`#/quiz/${e.currentTarget.dataset.cbanner}`); }
-=======
->>>>>>> origin/main
 }
 
 /* ---- Trainer dashboard ---- */
@@ -1297,7 +1276,6 @@ function wireNoteList(mount,notes){
   mount.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();confirmModal("Delete this note?",async()=>{await db.remove("notes",b.dataset.del);toast("Note deleted");render();});}));
 }
 
-<<<<<<< HEAD
 /* ===== Notes portal (v3): library + reading experience ===== */
 const NOTE_TOPICS={
   found:{label:"Foundations",icon:"🧭"}, stats:{label:"Statistics",icon:"📈"}, prob:{label:"Probability",icon:"🎲"},
@@ -1334,13 +1312,10 @@ function noteTile(n,cmap,rd){
     </div></article>`;
 }
 
-=======
->>>>>>> origin/main
 async function viewNotes(mount){
   const [notes,courses]=await Promise.all([db.allNotes(),db.courses()]);
   const cmap=Object.fromEntries(courses.map(c=>[c.id,c]));
   const faculty=notes.filter(n=>n.kind!=='prereq');
-<<<<<<< HEAD
   const rd=readStore.get();
   const sts=faculty.map(noteStats);
   const totMin=sts.reduce((a,s)=>a+s.mins,0), totRuns=sts.reduce((a,s)=>a+s.runs,0);
@@ -1391,14 +1366,6 @@ async function viewNotes(mount){
   $("[data-add]")?.addEventListener("click",()=>editNote(null));
   wireNoteList(mount,notes);
   mount.querySelectorAll(".ntile").forEach(t=>t.addEventListener("keydown",e=>{ if(e.key==="Enter") location.hash=`#/note/${t.dataset.openNote}`; }));
-=======
-  mount.innerHTML=`
-    <div class="page-h"><div><h1>Faculty notes</h1><p>Reference notes and reading posted by trainers. Click any note to open it.</p></div>
-      ${Auth.canManage?`<button class="btn btn--primary" data-add>${I.plus} Post note</button>`:""}</div>
-    <div class="stack">${faculty.map(n=>noteListCard(n,cmap)).join("")||emptyBlock("No notes yet","Trainers can post reference notes here.",I.note)}</div>`;
-  $("[data-add]")?.addEventListener("click",()=>editNote(null));
-  wireNoteList(mount,notes);
->>>>>>> origin/main
 }
 
 async function viewPrereq(mount){
@@ -1431,7 +1398,6 @@ async function viewPrereq(mount){
 }
 
 async function viewNote(mount,r){
-<<<<<<< HEAD
   scrollTo(0,0);
   const n=await db.note(r.id);
   if(!n){ mount.innerHTML=emptyBlock("Note not found","It may have been removed.",I.note); return; }
@@ -1497,31 +1463,6 @@ async function viewNote(mount,r){
   if(window.__noteScroll) removeEventListener("scroll",window.__noteScroll);
   window.__noteScroll=onS; addEventListener("scroll",onS,{passive:true}); upd();
   top.addEventListener("click",()=>scrollTo({top:0,behavior:"smooth"}));
-=======
-  const n=await db.note(r.id);
-  if(!n){ mount.innerHTML=emptyBlock("Note not found","It may have been removed.",I.note); return; }
-  const courses=await db.courses();
-  const c=courses.find(x=>x.id===n.course_id);
-  const backHash = n.kind==='prereq' ? '#/prereq' : '#/notes';
-  mount.innerHTML=`
-    <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} ${n.kind==='prereq'?'All prerequisites':'All notes'}</button>
-    <div class="card card--pad">
-      <div class="between" style="align-items:flex-start">
-        <div style="min-width:0">
-          <div class="course-tag muted" style="font-size:.83rem">${c?esc(c.title):"General"}${n.kind==='prereq'?" · Prerequisite":""}</div>
-          <h1 style="font-family:var(--font-d);font-size:1.5rem;letter-spacing:-.02em;margin:.25rem 0 .1rem">${esc(n.title)}</h1>
-          <div class="muted" style="font-size:.83rem">${esc(n.author||"Faculty")} · ${fmtDate(n.created_at)}</div>
-        </div>
-        ${Auth.canManage?`<div style="display:flex;gap:.3rem;flex:none">
-          <button class="btn btn--ghost btn--sm" data-edit>${I.edit} Edit</button></div>`:""}
-      </div>
-      <div class="rt" style="margin-top:1rem">${renderRich(n.body)}</div>
-      ${n.attachment_url?`<div style="margin-top:1rem"><a class="mchip" href="${esc(n.attachment_url)}" target="_blank" rel="noopener">${I.file} Open attachment ${I.ext}</a></div>`:""}
-    </div>`;
-  $("[data-back]").addEventListener("click",()=>location.hash=backHash);
-  $("[data-edit]")?.addEventListener("click",()=>editNote(n,n.course_id));
-  wireRunBlocks(mount);
->>>>>>> origin/main
 }
 
 /* =============================================================== PYTHON PLAYGROUND */
@@ -1941,7 +1882,6 @@ async function viewMySubmissions(mount){
   mount.querySelectorAll("[data-open]").forEach(el=>el.addEventListener("click",()=>location.hash=`#/assignment/${el.dataset.open}`));
 }
 
-<<<<<<< HEAD
 /* =============================================================== QUIZZES
    Two kinds of quiz share the quizzes / quiz_questions tables:
    · Practice quiz — gamified: one question at a time, instant feedback,
@@ -2037,15 +1977,11 @@ function computeXP(attempts, quizzes){
 }
 
 /* ---------------------------------------------------------------- list */
-=======
-/* =============================================================== QUIZZES */
->>>>>>> origin/main
 async function viewQuizzes(mount){
   const [quizzes,courses,attempts]=await Promise.all([db.quizzes(),db.courses(),db.myAttempts(Auth.user.id).catch(()=>[])]);
   const cmap=Object.fromEntries(courses.map(c=>[c.id,c]));
   const best={};
   for(const at of attempts){ if(!best[at.quiz_id]||at.pct>best[at.quiz_id].pct) best[at.quiz_id]=at; }
-<<<<<<< HEAD
   const contests=quizzes.filter(q=>q.is_contest).sort((a,b)=>new Date(a.opens_at||0)-new Date(b.opens_at||0));
   const activeC=contests.filter(q=>contestState(q)!=="ended");
   const pastC=contests.filter(q=>contestState(q)==="ended").reverse();
@@ -2093,21 +2029,11 @@ async function viewQuizzes(mount){
       const c=cmap[q.course_id]; const b=best[q.id]; const st=b?starsFor(b.pct):0;
       return `<button class="course qcard" data-open-quiz="${q.id}" data-accent="violet">
         <div class="course__band qcard__band"><span class="qcard__stars">${starRow(st)}</span></div>
-=======
-  mount.innerHTML=`
-    <div class="page-h"><div><h1>Practice quizzes</h1><p>Check your understanding — auto-graded, take them as many times as you like.</p></div>
-      ${Auth.canManage?`<button class="btn btn--primary" data-add>${I.plus} New quiz</button>`:""}</div>
-    <div class="grid">${quizzes.map(q=>{
-      const c=cmap[q.course_id]; const b=best[q.id];
-      return `<button class="course" data-open-quiz="${q.id}" data-accent="violet">
-        <div class="course__band" style="color:#fff">${I.quiz}</div>
->>>>>>> origin/main
         <div class="course__body">
           <h3>${esc(q.title)}</h3>
           <p>${esc(q.description||"")}</p>
           <div class="course__meta">
             <span>${I.book}${c?esc(c.title):"General"}</span>
-<<<<<<< HEAD
             ${b?`<span>${b.passed?I.check:I.clock} Best ${b.pct}%</span>`:`<span>${I.play} ${Auth.canManage?"Manage":"Play"}</span>`}
           </div>
         </div></button>`;
@@ -2125,14 +2051,6 @@ async function viewQuizzes(mount){
     if(flip){ QTimers.clear(); render(); }
   };
   if(mount.querySelector("[data-cd]")) QTimers.every(tick,1000);
-=======
-            ${b?`<span>${b.passed?I.check:I.clock} Best ${b.pct}%</span>`:`<span>${I.play} ${Auth.canManage?"Manage":"Not attempted"}</span>`}
-          </div>
-        </div></button>`;
-    }).join("")||emptyBlock("No quizzes yet","Trainers can add practice quizzes here.",I.quiz)}</div>`;
-  mount.querySelectorAll("[data-open-quiz]").forEach(el=>el.addEventListener("click",()=>location.hash=`#/quiz/${el.dataset.openQuiz}`));
-  $("[data-add]")?.addEventListener("click",()=>editQuiz(null));
->>>>>>> origin/main
 }
 function quizRow(q){
   return `<div class="rowc" data-open-quiz="${q.id}" style="cursor:pointer">
@@ -2141,7 +2059,6 @@ function quizRow(q){
     <div class="rowc__act"><span style="color:var(--muted-2)">${I.chev}</span></div></div>`;
 }
 
-<<<<<<< HEAD
 /* ---------------------------------------------------------- one quiz */
 async function viewQuiz(mount,r){
   const q=await db.quiz(r.id);
@@ -2599,109 +2516,6 @@ function contestBannerHTML(quizzes){
     <span class="cbanner__t">⚔️ ${esc(soon.title)}</span>
     <span class="cbanner__w">${live?`closes ${fmtTime(soon.closes_at)}`:`${fmtTime(soon.opens_at)} – ${fmtTime(soon.closes_at)}`}</span>
     <span class="btn btn--primary btn--sm">${live?"Enter":"Details"} ${I.chev}</span></button>`;
-=======
-async function viewQuiz(mount,r){
-  const q=await db.quiz(r.id);
-  if(!q){ mount.innerHTML=emptyBlock("Quiz not found",""); return; }
-  const questions=await db.quizQuestions(q.id);
-
-  if(Auth.canManage){
-    mount.innerHTML=`
-      <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
-      <div class="page-h"><div><h1>${esc(q.title)}</h1><p>${esc(q.description||"")} · Pass mark ${q.pass_pct}%</p></div>
-        <div style="display:flex;gap:.5rem">
-          <button class="btn btn--ghost btn--sm" data-edit-quiz>${I.edit} Edit quiz</button>
-          <button class="btn btn--danger btn--sm" data-del-quiz>${I.trash}</button></div></div>
-      <div class="section-h"><h2>Questions</h2><span class="count">${questions.length}</span>
-        <button class="btn btn--primary btn--sm" style="margin-left:auto" data-add-q>${I.plus} Add question</button></div>
-      <div class="stack">${questions.map((qq,i)=>`
-        <div class="card card--pad">
-          <div class="between" style="align-items:flex-start">
-            <div style="min-width:0"><b>Q${i+1}.</b> ${esc(qq.prompt)}</div>
-            <div style="display:flex;gap:.3rem;flex:none">
-              <button class="btn btn--ghost btn--sm" data-edit-q="${qq.id}">${I.edit}</button>
-              <button class="btn btn--danger btn--sm" data-del-q="${qq.id}">${I.trash}</button></div>
-          </div>
-          <ol style="margin:.7rem 0 0;padding-left:1.2rem" class="muted">${(qq.options||[]).map((o,oi)=>`<li style="${oi===qq.correct_index?"color:var(--teal);font-weight:600":""}">${esc(o)}${oi===qq.correct_index?" ✓":""}</li>`).join("")}</ol>
-          ${qq.explanation?`<p class="muted" style="font-size:.85rem;margin:.6rem 0 0"><b>Why:</b> ${esc(qq.explanation)}</p>`:""}
-        </div>`).join("")||`<p class="muted">No questions yet — add the first one.</p>`}</div>`;
-    $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes");
-    $("[data-edit-quiz]").addEventListener("click",()=>editQuiz(q));
-    $("[data-del-quiz]").addEventListener("click",()=>confirmModal("Delete this quiz and its questions?",async()=>{await db.remove("quizzes",q.id);toast("Quiz deleted");location.hash="#/quizzes";}));
-    $("[data-add-q]").addEventListener("click",()=>editQuestion(q.id,null,questions.length));
-    mount.querySelectorAll("[data-edit-q]").forEach(b=>b.addEventListener("click",()=>editQuestion(q.id,questions.find(x=>x.id===b.dataset.editQ),questions.length)));
-    mount.querySelectorAll("[data-del-q]").forEach(b=>b.addEventListener("click",()=>confirmModal("Delete this question?",async()=>{await db.remove("quiz_questions",b.dataset.delQ);toast("Question deleted");render();})));
-    return;
-  }
-
-  runQuiz(mount,q,questions);
-}
-
-function runQuiz(mount,q,questions){
-  if(!questions.length){ mount.innerHTML=`<button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>${emptyBlock("No questions yet","This quiz has no questions to answer.",I.quiz)}`; $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes"); return; }
-  const answers=new Array(questions.length).fill(null);
-  const paint=()=>{
-    mount.innerHTML=`
-      <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
-      <div class="card card--pad" style="margin-bottom:1rem">
-        <h1 style="font-family:var(--font-d);font-size:1.5rem;margin:0 0 .2rem">${esc(q.title)}</h1>
-        <p class="muted" style="margin:0">${esc(q.description||"")} · ${questions.length} questions · pass mark ${q.pass_pct}%</p>
-      </div>
-      <form data-quizform>
-        ${questions.map((qq,i)=>`
-          <div class="card card--pad" style="margin-bottom:.9rem" data-q="${i}">
-            <div style="font-weight:600;margin-bottom:.7rem"><span class="flame">Q${i+1}.</span> ${esc(qq.prompt)}</div>
-            <div class="qopts">${(qq.options||[]).map((o,oi)=>`
-              <label class="qopt"><input type="radio" name="q${i}" value="${oi}"/><span>${esc(o)}</span></label>`).join("")}</div>
-          </div>`).join("")}
-        <button class="btn btn--primary" data-grade style="margin-top:.4rem">Submit quiz</button>
-      </form>`;
-    $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes");
-    mount.querySelectorAll(".qopt input").forEach(inp=>inp.addEventListener("change",e=>{
-      const qi=Number(e.target.name.slice(1)); answers[qi]=Number(e.target.value);
-      e.target.closest("[data-q]").querySelectorAll(".qopt").forEach(l=>l.classList.remove("sel"));
-      e.target.closest(".qopt").classList.add("sel");
-    }));
-    $("[data-grade]").addEventListener("click", async (e)=>{
-      e.preventDefault();
-      if(answers.some(a=>a===null)){ toast("Answer every question first","err"); return; }
-      let score=0; questions.forEach((qq,i)=>{ if(answers[i]===qq.correct_index) score+=(qq.points||1); });
-      const total=questions.reduce((s,qq)=>s+(qq.points||1),0);
-      const pct=Math.round(score/total*100); const passed=pct>=(q.pass_pct||60);
-      try{ await db.saveAttempt({quiz_id:q.id,user_id:Auth.user.id,score,total,pct,passed,answers,submitted_at:new Date().toISOString()}); }catch(err){ /* still show result */ }
-      showResult(mount,q,questions,answers,{score,total,pct,passed},paint);
-    });
-  };
-  paint();
-}
-function showResult(mount,q,questions,answers,res,retry){
-  mount.innerHTML=`
-    <button class="btn btn--ghost btn--sm" data-back style="margin-bottom:1rem">${I.back} All quizzes</button>
-    <div class="hero" style="text-align:center">
-      <div class="peak" style="right:auto;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.14);width:120px">${res.passed?I.trophy:I.quiz}</div>
-      <div class="kicker">${esc(q.title)}</div>
-      <h2 style="font-size:2.6rem">${res.pct}%</h2>
-      <p>${res.passed?"Passed — nicely done! 🎉":"Not quite — review the notes and try again."} You scored ${res.score} of ${res.total}.</p>
-    </div>
-    <div class="section-h"><h2>Review answers</h2></div>
-    <div class="stack">${questions.map((qq,i)=>{
-      const ok=answers[i]===qq.correct_index;
-      return `<div class="card card--pad">
-        <div style="font-weight:600;margin-bottom:.5rem">${ok?`<span class="teal">${I.check}</span>`:`<span class="flame">${I.alert}</span>`} Q${i+1}. ${esc(qq.prompt)}</div>
-        <div class="qopts">${(qq.options||[]).map((o,oi)=>{
-          let cls=""; if(oi===qq.correct_index) cls="right"; else if(oi===answers[i]) cls="wrong";
-          return `<div class="qopt review ${cls}"><span>${esc(o)}</span>${oi===qq.correct_index?`<b class="teal">correct</b>`:(oi===answers[i]?`<b class="flame">your answer</b>`:"")}</div>`;
-        }).join("")}</div>
-        ${qq.explanation?`<p class="muted" style="font-size:.85rem;margin:.6rem 0 0"><b>Why:</b> ${esc(qq.explanation)}</p>`:""}
-      </div>`;
-    }).join("")}</div>
-    <div style="display:flex;gap:.6rem;margin-top:1.2rem">
-      <button class="btn btn--primary" data-retry>Try again</button>
-      <a class="btn btn--ghost" href="#/quizzes">Back to quizzes</a>
-    </div>`;
-  $("[data-back]").addEventListener("click",()=>location.hash="#/quizzes");
-  $("[data-retry]").addEventListener("click",retry);
->>>>>>> origin/main
 }
 
 /* =============================================================== CAPSTONE */
@@ -3310,7 +3124,6 @@ async function editAssignment(a){
 }
 async function editQuiz(q){
   const courses=await db.courses();
-<<<<<<< HEAD
   formModal({title:q?"Edit quiz":"New quiz / contest", submitLabel:q?"Save":"Create", wide:true,
     fields:[
       {name:"title",label:"Title",required:true,placeholder:"NumPy filtering — quick check"},
@@ -3332,27 +3145,11 @@ async function editQuiz(q){
       } else { d.opens_at=null; d.closes_at=null; d.duration_mins=null; }
       if(q){ await db.update("quizzes",q.id,d); toast("Saved"); render(); }
       else{ const created=await db.create("quizzes",{...d,is_published:true,sort_order:Date.now()}); toast("Created — now add questions"); location.hash=`#/quiz/${created.id}`; } }});
-=======
-  formModal({title:q?"Edit quiz":"New quiz", submitLabel:q?"Save":"Create quiz",
-    fields:[
-      {name:"title",label:"Quiz title",required:true,placeholder:"Git basics — quick check"},
-      {name:"description",label:"Description",type:"textarea",placeholder:"A short line about what it covers."},
-      {row:[{name:"course_id",label:"Course",type:"select",options:[{value:"",label:"— General —"},...courses.map(c=>({value:c.id,label:c.title}))]},
-            {name:"pass_pct",label:"Pass mark (%)",type:"number",placeholder:"60"}]},
-    ], values:q?{...q}:{pass_pct:60,course_id:""},
-    onSubmit:async(d)=>{ if(!d.course_id) d.course_id=null; d.pass_pct=d.pass_pct||60;
-      if(q){ await db.update("quizzes",q.id,d); toast("Quiz saved"); render(); }
-      else{ const created=await db.create("quizzes",{...d,is_published:true,sort_order:Date.now()}); toast("Quiz created — now add questions"); location.hash=`#/quiz/${created.id}`; } }});
->>>>>>> origin/main
 }
 function editQuestion(quizId,qq,count){
   const opts=(qq?.options||["","","",""]);
   const body=`<form data-form>
-<<<<<<< HEAD
     <div class="field"><label>Question <span class="hint">wrap code in \`backticks\`; indent lines 4 spaces for a code block</span></label><textarea name="prompt" rows="5" placeholder="Which command creates a new branch?">${esc(qq?.prompt||"")}</textarea></div>
-=======
-    <div class="field"><label>Question</label><textarea name="prompt" placeholder="Which command creates a new branch?">${esc(qq?.prompt||"")}</textarea></div>
->>>>>>> origin/main
     <div class="field"><label>Answer options <span class="hint">tick the correct one</span></label>
       ${[0,1,2,3].map(i=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
         <input type="radio" name="correct" value="${i}" ${((qq?.correct_index)??0)===i?"checked":""}/>
