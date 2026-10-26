@@ -1,0 +1,47 @@
+00:18:10	Sudeep Bhargava:	p1 = Truep2 = Falsep3 = Truep1 & p2   # p1 AND p2p1 & p3   # p1 AND p3
+00:22:47	Sudeep Bhargava:	a1 = np.array([3,6,5,7,9,8,7,5,4,6,5,7,10,3])
+00:24:02	Sudeep Bhargava:	# a1 >= 3 and a1 <= 7
+00:25:10	Sudeep Bhargava:	np.where((a1>=4) & (a1 <= 7))
+00:28:52	Sudeep Bhargava:	a1 = np.array([3,6,5,7,9,8,7,5,4,6,5,7,10,3])# a1 >= 4 and a1 <= 7ind = np.where((a1>=4) & (a1 <= 7))   # two conditions -> a1>=4 AND a1 <=7# (array([ 1,  2,  3,  6,  7,  8,  9, 10, 11]),)len(ind[0])    # number of values meeting BOTh criteriaa1[ind[0]]     # values that meet both criteria
+00:30:22	Sudeep Bhargava:	a1 = np.array([3,6,5,7,9,8,7,5,4,6,5,7,10,3])# a1 >= 4 and a1 <= 7ind = np.where((a1>=4) & (a1 <= 7))   # two conditions -> a1>=4 AND a1 <=7# (array([ 1,  2,  3,  6,  7,  8,  9, 10, 11]),)len(ind[0])    # number of values meeting BOTh criteria((a1>=4) & (a1 <= 7)).sum()   # number of values meeting BOTh criteriaa1[ind[0]]     # values that meet both criteriaa1[(a1>=4) & (a1 <= 7)]   # values that meet both criteria
+00:31:23	Suraj Shankhwar:	no sir
+00:35:51	Sudeep Bhargava:	import osos.getcwd()
+00:37:37	Sudeep Bhargava:	os.chdir(r'C:\\Users\\Sudeep Bhargava\\Downloads')
+00:38:46	Shubham Wadhave:	yes sir in vscode
+00:38:55	Sagar Jadhav:	yes sir
+00:39:19	Aniket Jadhav:	in google colab cwd is /content
+00:40:10	Aniket Jadhav:	uploaded using directly gui
+00:40:46	Aniket Jadhav:	OK Sir
+00:41:10	Aditya Kansana:	Working on colab
+00:41:30	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='ERPData')
+00:41:49	Aniket Jadhav:	working in colab
+00:50:04	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='ERPData')df.shape   # gives the number of rows and columns# first number is number of rows and second one is for number of columnsdf.head()  # shows the first five rowsdf.tail()  # shows the last five rowsdf.columns # gives the names of all columnsx1 = df.Quantity  # extracts all values of Quantity column of df and stores them in x1
+00:58:23	Sudeep Bhargava:	# find the location which has the heaviest consignmentind = np.where(df.Quantity == max(df.Quantity))
+00:59:43	Shivraj Singh:	yes
+00:59:48	Sagar Jadhav:	yes
+00:59:51	Aniket Takmare CDAC:	yes sir
+01:01:11	Sudeep Bhargava:	df.Location[ind[0]]df.MaterialID[ind[0]]
+01:02:25	Sudeep Bhargava:	ind = np.where(df.Quantity == max(df.Quantity))df.Location[ind[0]]    # location of the consignment with highest weightdf.MaterialID[ind[0]]  # materialID of the consignment with highest weight
+01:03:33	Suraj Shankhwar:	no sir
+01:03:33	Trupti Badhekar:	no sir
+01:03:33	Aditya Kansana:	Working fine
+01:11:04	Sudeep Bhargava:	# create a separate DataFrame of only the rows belonging to MWH-2ind = np.where(df.Location=='MWH-2')mydf = df.iloc[ind[0]]
+01:20:06	Sudeep Bhargava:	ind = np.where(df.Location=='MWH-2')mydf = df.iloc[ind[0]]mydf.iloc[[0,2]]   # extracts the rows with the index 0 and 2 OR the first and third rowmydf.iloc[[2,8]]   # extracts thr rows with the label 2 and 8 from mydf. If these lables are not found then error ir reported
+01:21:29	Aditya Kansana:	CC
+01:21:30	Himanshu Nigam:	sir on line no 106 , it should be loc ?
+01:21:47	Sudeep Bhargava:	ind = np.where(df.Location=='MWH-2')mydf = df.iloc[ind[0]]mydf.iloc[[0,2]]   # extracts the rows with the index 0 and 2 OR the first and third rowmydf.loc[[2,8]]   # extracts the rows with the label 2 and 8 from mydf. If these lables are not found then error ir reported
+01:21:52	Himanshu Nigam:	np sir
+01:30:33	Sudeep Bhargava:	ind = np.where(df.Location=='MWH-2')mydf = df.iloc[ind[0]]mydf.iloc[[0,2]]   # extracts the rows with the index 0 and 2 OR the first and third rowmydf.loc[[2,8]]   # extracts the rows with the label 2 and 8 from mydf. If these lables are not found then error ir reportedmydf = df.iloc[ind[0]].reset_index(drop=True)   # this ensures that the labels and the indices match together.# The lables also start from 0
+01:37:38	Himanshu Nigam:	6/10 in basic python
+01:37:44	Shubham Wadhave:	8/10
+01:37:57	Aditya Kansana:	5/10
+01:37:58	Shilbhushan Khanderao:	5/10
+01:38:09	Aditya Gade:	4/10
+01:38:35	Aniket Jadhav:	7/10
+01:45:29	Sudeep Bhargava:	df2 = df.drop(ind[0])    # this drops or deletes the rows of index ind[0] and saves the new dataframe as df2
+01:46:55	Sudeep Bhargava:	df1 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Pune')df2 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Mumbai')
+01:53:01	Sudeep Bhargava:	master_df = pd.concat([df1,df2]).reset_index(drop=True)# puts all the rows of df2 under the rows of df1# works when the number and name of columns match in both df1 and df2
+01:59:30	Sudeep Bhargava:	pd.merge(df1,df2)# report the rows which are common to both df1 and df2# rows are common when the entries under ALL columns match
+02:05:42	Rahul Chaudhari:	thank you sir
+02:05:45	Sagar Jadhav:	Thank you Sir
+02:06:05	Sandesh Jadhav:	Thank you sir

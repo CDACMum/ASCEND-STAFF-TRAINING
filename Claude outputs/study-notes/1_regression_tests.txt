@@ -1,0 +1,414 @@
+Correlation · Simple regression · Two-sample test · Dummy variables · Logistic regression · Chi-square
+
+These notes rebuild what Sudeep Bhargava taught in the three sessions, in the order he taught it, using the same variable names and the same CDAC_DataBook.xlsx sheets (faithful, salaries, diabetes). Every runnable cell below uses SIMULATED data with a fixed seed, because the Excel file is not available inside the browser. Your numbers in class (for example p = 0.0054 for the gender test) will therefore differ slightly from the numbers printed here. The code is identical, so paste it into your notebook and swap the simulated lines for pd.read_excel(...).
+
+How to read the grades:
+• 🟢 Start here — the idea and the one line of code
+• 🔵 Core — what the exam and the assignments ask
+• 🟠 Go deeper — why it works, common traps
+• 🔴 Stretch — optional, for the curious
+
+────────────────────────────────────────
+🟢 1 · The one question to ask first
+────────────────────────────────────────
+Before choosing any method, name your variables. Everything taught in these three sessions follows from two labels on each column:
+
+• ROLE — is it the response (the thing you want to explain or predict, also called y or the output) or a predictor (the thing you use to explain it, also called x or the input)?
+• TYPE — is it continuous (numbers on a scale: salary, waiting time, glucose) or categorical (labels: gender, rank, diet type)? A categorical variable with exactly two labels is binary (Outcome = 0/1).
+
+Examples from class:
+• salary — response, continuous
+• yrs_service — predictor 1, continuous
+• gender — predictor 2, categorical
+• Outcome (diabetes yes/no) — response, binary
+• Glucose, BloodPressure, Age — continuous predictors; DietType — categorical predictor
+
+Which tool fits which pair:
+
+    Predictor      Response       Look at it with        Test / model
+    continuous     continuous     scatter plot           Pearson correlation, linear regression
+    categorical    continuous     box plot               2-sample test (2 groups), regression with dummy variables
+    categorical    categorical    crosstab, bar chart    chi-square test of independence
+    mixed          binary         —                      logistic regression
+
+────────────────────────────────────────
+🟢 2 · Correlation — how tightly do two numbers move together?
+────────────────────────────────────────
+The Pearson correlation coefficient r measures the strength and direction of a STRAIGHT-LINE relationship between two continuous variables.
+
+• r is always between −1 and +1
+• r close to +1: when x goes up, y goes up, almost on a line
+• r close to −1: when x goes up, y goes down
+• r close to 0: no straight-line relationship (there could still be a curved one)
+• Correlation is NOT causation — it only says the two move together
+
+Faculty code (the faithful sheet: waiting = minutes between eruptions, eruptions = length of an eruption):
+
+    df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='faithful')
+    x = df.waiting
+    y = df.eruptions
+    from scipy.stats import pearsonr
+    pearsonr(x, y)   # value of the correlation coefficient
+
+pearsonr returns two numbers: r and a p-value. The p-value belongs to the hypothesis test:
+• Ho (null): the true correlation is 0, i.e. y does not depend on x
+• If p < 0.05, REJECT Ho — there is evidence of a relationship
+• If p ≥ 0.05, fail to reject Ho — no evidence
+
+In class, for salary vs yrs_service the p-value printed as 0, which is below 0.05, so the conclusion written on the board was: "salary depends on yrs_service".
+
+@run Correlation on simulated faithful-style data
+    import numpy as np
+    from scipy.stats import pearsonr
+
+    rng = np.random.default_rng(42)
+    waiting = rng.normal(70, 13, 272).round()
+    eruptions = -1.87 + 0.0756 * waiting + rng.normal(0, 0.4, 272)
+
+    r, p = pearsonr(waiting, eruptions)
+    print("r       = %.3f" % r)
+    print("p-value = %.2e" % p)
+    if p < 0.05:
+        print("p < 0.05  ->  reject Ho: eruptions depend on waiting time")
+    else:
+        print("p >= 0.05 ->  cannot reject Ho")
+
+────────────────────────────────────────
+🔵 3 · Simple linear regression — draw the best line
+────────────────────────────────────────
+Regression turns "they move together" into a usable equation:
+
+    eruptions = intercept + coef × waiting
+
+• coef (slope): how much y changes when x increases by 1 unit
+• intercept: the value of y when x = 0
+• R² (from regressor.score): the share of the variation in y explained by x. Between 0 and 1; closer to 1 means a better fit. Read it the same way as r: closer to 1 (or −1 for r) is stronger.
+
+Faculty code on 6 October:
+
+    import sklearn
+    from sklearn.linear_model import LinearRegression
+    regressor = LinearRegression()
+    x = df.waiting
+    y = df.eruptions
+    x = np.array(x).reshape(-1, 1)
+    regressor.fit(x, y)
+    print(regressor.coef_)
+    print(regressor.intercept_)
+
+🟠 Why reshape(-1, 1)? scikit-learn expects x as a TABLE (rows = observations, columns = features), even if there is only one feature. A plain column of numbers is a 1-D array, so we turn it into n rows × 1 column. The −1 means "Python, work out n yourself" (see the NumPy note of 14 October).
+
+@run Fit a line, read the coefficients, predict
+    import numpy as np
+    from sklearn.linear_model import LinearRegression
+
+    rng = np.random.default_rng(42)
+    waiting = rng.normal(70, 13, 272).round()
+    eruptions = -1.87 + 0.0756 * waiting + rng.normal(0, 0.4, 272)
+
+    x = np.array(waiting).reshape(-1, 1)
+    y = eruptions
+    regressor = LinearRegression()
+    regressor.fit(x, y)
+
+    print("coef      :", regressor.coef_)
+    print("intercept :", regressor.intercept_)
+    print("R-squared : %.3f" % regressor.score(x, y))
+    print("predicted eruption after a 80-minute wait: %.2f" % regressor.predict([[80]])[0])
+
+────────────────────────────────────────
+🔵 4 · Does a categorical variable change a continuous one? (2-sample test)
+────────────────────────────────────────
+Question from the salaries sheet: do male and female staff earn the same on average?
+
+Step 1 — look first. A box plot of salary split by gender shows the two groups side by side.
+
+Step 2 — split the response into the two groups:
+
+    mydf = df[['yrs_service', 'gender', 'salary']]
+    x1 = mydf.salary.iloc[np.where(mydf.gender == 'Male')]     # salaries of the male rows
+    x2 = mydf.salary.iloc[np.where(mydf.gender == 'Female')]   # salaries of the female rows
+    plt.boxplot([x1, x2])
+
+Step 3 — test:
+• Ho: average salary of males = average salary of females
+• Ha: the averages are different
+
+    import statsmodels
+    from statsmodels import stats
+    from statsmodels.stats import weightstats as ssw
+    ssw.ztest(x1, x2)
+    # p-value = 0.0054 < 0.05  ->  reject Ho
+    # average salary of males is not equal to average salary of females
+
+Rule for the p-value: small p (below the 0.05 cut-off) means the data would be very surprising if Ho were true, so we reject Ho.
+
+🟠 z-test or t-test? With large groups (30 or more in each) the z-test and the 2-sample t-test give nearly identical answers. The board called it a "2 sample t test"; the code used was ztest. Both ideas are tested in the cell below. The statsmodels line above is shown for reference — the cell uses scipy so that it runs in your browser.
+
+@run Two-sample comparison on simulated salaries
+    import numpy as np
+    from scipy.stats import norm, ttest_ind
+
+    rng = np.random.default_rng(7)
+    x1 = rng.normal(115000, 30000, 300)   # "male" salaries
+    x2 = rng.normal(101000, 28000, 60)    # "female" salaries
+
+    # z statistic by hand (what ztest does)
+    se = np.sqrt(x1.var(ddof=1)/len(x1) + x2.var(ddof=1)/len(x2))
+    z = (x1.mean() - x2.mean()) / se
+    p_z = 2 * (1 - norm.cdf(abs(z)))
+
+    t_stat, p_t = ttest_ind(x1, x2, equal_var=False)
+    print("mean male   = %.0f" % x1.mean())
+    print("mean female = %.0f" % x2.mean())
+    print("z-test  p = %.4f" % p_z)
+    print("t-test  p = %.4f" % p_t)
+    print("Reject Ho (means equal)?", p_z < 0.05)
+
+────────────────────────────────────────
+🔵 5 · Putting a category into a regression: dummy variables
+────────────────────────────────────────
+A regression equation only understands numbers. A column of words like Male / Female must be converted first. The trick is a DUMMY (0/1) column:
+
+    g_dummy = pd.get_dummies(mydf.gender, drop_first=True).astype(int)
+    mydf = mydf.drop('gender', axis=1)
+    mydf = pd.concat([mydf, g_dummy], axis=1)
+    x = mydf.drop('salary', axis=1)     # inputs
+    y = mydf.salary                     # output
+    from sklearn.linear_model import LinearRegression
+    reg1 = LinearRegression()
+    reg1.fit(x, y)
+    reg1.coef_
+    reg1.intercept_
+
+What happens: gender has two labels, so we keep ONE dummy column (Male = 1, Female = 0). Female becomes the REFERENCE LEVEL — the label that is left out and treated as the baseline. Alphabetical order decides the reference (Female comes before Male). drop_first=True does the dropping.
+
+How to read the output (the sentences from the board):
+• coefficient of yrs_service = 747.61 → when yrs_service goes up by 1 unit, salary goes up by 747.61, holding gender fixed
+• coefficient of the Male dummy = 9071.8 → for the SAME years of service, choosing a male candidate over a female means paying 9071.8 more
+• intercept = 92356 → the salary of a FEMALE (reference level) with yrs_service = 0
+
+The general rule for the intercept: it is the predicted response when every continuous predictor is 0 AND every categorical predictor sits at its reference level.
+
+🟠 Why drop one column? If you kept both Female and Male dummies, one is always 1 − the other, so the model cannot tell them apart (the "dummy variable trap"). A variable with k labels needs k − 1 dummy columns.
+
+@run Dummy-variable regression (simulated with known answers)
+    import numpy as np
+    import pandas as pd
+    from sklearn.linear_model import LinearRegression
+
+    rng = np.random.default_rng(1)
+    n = 800
+    yrs = rng.integers(0, 40, n)
+    gender = np.where(rng.random(n) < 0.8, "Male", "Female")
+    salary = 92356 + 747.6*yrs + 9071.8*(gender == "Male") + rng.normal(0, 15000, n)
+    mydf = pd.DataFrame({"yrs_service": yrs, "gender": gender, "salary": salary})
+
+    g_dummy = pd.get_dummies(mydf.gender, drop_first=True).astype(int)
+    mydf = pd.concat([mydf.drop("gender", axis=1), g_dummy], axis=1)
+    print("columns now:", list(mydf.columns))
+
+    x = mydf.drop("salary", axis=1)
+    y = mydf.salary
+    reg1 = LinearRegression().fit(x, y)
+    for name, c in zip(x.columns, reg1.coef_):
+        print("%-12s coefficient = %9.1f" % (name, c))
+    print("intercept (female, 0 yrs) = %.0f" % reg1.intercept_)
+    print("true values used: 747.6, 9071.8, 92356")
+
+────────────────────────────────────────
+🔵 6 · A category with more than two labels (rank)
+────────────────────────────────────────
+On 8 October the same salaries sheet was used with rank, which has three labels: AsstProf, AssocProf, Prof.
+
+    df = df[['rank', 'yrs_service', 'salary']]
+    rank_dummy = pd.get_dummies(df['rank'], drop_first=True).astype(int)
+    df = df.drop('rank', axis=1)
+    df = pd.concat([df, rank_dummy], axis=1)
+    x = df.drop('salary', axis=1)    # input columns
+    y = df.salary                    # output column
+    regr = LinearRegression()
+    regr.fit(x, y)
+    regr.coef_
+
+Three labels → two dummy columns (AsstProf, Prof). The reference level is AssocProf (first alphabetically). The coefficients on the board and what they mean:
+
+    Coefficient   Belongs to     Reading
+    −158          yrs_service    each extra year, rank unchanged: salary falls by 158
+    −14615        AsstProf       AssocProf → AsstProf, same years: salary falls by 14615
+    +34613        Prof           AssocProf → Prof, same years: salary rises by 34613
+    95767         intercept      yrs_service = 0 and rank = AssocProf: salary is 95767
+
+Always say "compared with the reference level" — a dummy coefficient is a DIFFERENCE from the baseline, never an absolute salary.
+
+@run Three-level categorical predictor
+    import numpy as np
+    import pandas as pd
+    from sklearn.linear_model import LinearRegression
+
+    rng = np.random.default_rng(3)
+    n = 800
+    rank = rng.choice(["AsstProf", "AssocProf", "Prof"], n, p=[0.2, 0.2, 0.6])
+    yrs = rng.integers(0, 40, n)
+    salary = (95767 - 158*yrs - 14615*(rank == "AsstProf")
+              + 34613*(rank == "Prof") + rng.normal(0, 6000, n))
+    df = pd.DataFrame({"rank": rank, "yrs_service": yrs, "salary": salary})
+
+    rank_dummy = pd.get_dummies(df["rank"], drop_first=True).astype(int)
+    df = pd.concat([df.drop("rank", axis=1), rank_dummy], axis=1)
+    x = df.drop("salary", axis=1)
+    y = df.salary
+    regr = LinearRegression().fit(x, y)
+    print("reference level is the one MISSING from:", list(x.columns))
+    for name, c in zip(x.columns, regr.coef_):
+        print("%-12s %9.0f" % (name, c))
+    print("intercept    %9.0f" % regr.intercept_)
+
+────────────────────────────────────────
+🔵 7 · Binary response → logistic regression
+────────────────────────────────────────
+When the response is yes/no (diabetes: Outcome = 1 or 0), a straight line is a bad fit because probabilities must stay between 0 and 1. Logistic regression squeezes the line into an S-curve and predicts the PROBABILITY of Outcome = 1.
+
+Setup from the diabetes sheet:
+
+    df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='diabetes')
+    df = df[['Glucose', 'BloodPressure', 'Age', 'DietType', 'Outcome']]
+    # 'Glucose', 'BloodPressure', 'Age'  - continuous predictors
+    # DietType                           - categorical predictor
+    # Outcome                            - binary response
+    diet_dummy = pd.get_dummies(df['DietType'], prefix='Diet', drop_first=True).astype(int)
+    df = df.drop('DietType', axis=1)
+    df = pd.concat([df, diet_dummy], axis=1)
+
+    from sklearn.linear_model import LogisticRegression
+    log_mod = LogisticRegression()
+    x = df.drop('Outcome', axis=1)
+    y = df.Outcome
+    log_mod.fit(x, y)
+    log_mod.coef_
+
+Reading the coefficients (from the board):
+• Glucose coefficient is POSITIVE → raising glucose increases the probability of diabetes
+• Diet_2 coefficient is NEGATIVE → changing diet from Diet1 (reference) to Diet2 decreases the probability of diabetes
+
+Same dummy-variable logic as in section 5. The sign tells the direction; the size is on the log-odds scale.
+
+🟠 The magnitude is not "probability points". exp(coefficient) is the odds multiplier: exp(0.05) ≈ 1.05, so each extra unit of glucose multiplies the odds of diabetes by about 1.05, holding the other columns fixed.
+
+@run Logistic regression on simulated diabetes-style data
+    import numpy as np
+    import pandas as pd
+    from sklearn.linear_model import LogisticRegression
+
+    rng = np.random.default_rng(11)
+    n = 3000
+    df = pd.DataFrame({
+        "Glucose": rng.normal(120, 30, n).round(),
+        "BloodPressure": rng.normal(70, 12, n).round(),
+        "Age": rng.integers(21, 70, n),
+        "DietType": rng.choice([1, 2, 3], n),
+    })
+    logit = -9 + 0.06*df.Glucose + 0.015*df.Age - 0.8*(df.DietType == 2)
+    df["Outcome"] = (rng.random(n) < 1/(1 + np.exp(-logit))).astype(int)
+
+    diet_dummy = pd.get_dummies(df["DietType"], prefix="Diet", drop_first=True).astype(int)
+    df = pd.concat([df.drop("DietType", axis=1), diet_dummy], axis=1)
+    x = df.drop("Outcome", axis=1)
+    y = df.Outcome
+
+    log_mod = LogisticRegression(max_iter=2000).fit(x, y)
+    for name, c in zip(x.columns, log_mod.coef_[0]):
+        print("%-14s %7.3f   odds multiplier %.3f" % (name, c, np.exp(c)))
+    one = pd.DataFrame([[150, 70, 50, 0, 0]], columns=x.columns)
+    print("P(diabetes) for glucose 150, age 50, Diet1 = %.2f" % log_mod.predict_proba(one)[0][1])
+
+────────────────────────────────────────
+🔵 8 · Two categories against each other: chi-square test
+────────────────────────────────────────
+Is Outcome related to DietType? Both are categorical, so no averages exist — we compare COUNTS.
+
+    newdf = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='diabetes')
+    diet_counts = pd.DataFrame(newdf.DietType.value_counts())
+    diet_counts.plot(kind='bar')               # how many people on each diet
+    abc = pd.crosstab(newdf.Outcome, newdf.DietType)
+    abc.plot(kind='bar')                       # Outcome counts inside each diet
+    from scipy.stats import chi2_contingency
+    chi2_contingency(abc)
+
+• Ho: Outcome and DietType are independent (diet makes no difference)
+• Ha: they are associated
+• p < 0.05 → reject Ho
+
+crosstab builds the table of counts; chi2_contingency compares it with the table you would see if the two were unrelated. It returns four things: the chi-square statistic, the p-value, the degrees of freedom and the expected counts.
+
+Class also split the diabetes data by age (Age ≤ 35 vs Age > 35) and drew a bar chart of Outcome for each group — a quick visual way to see whether age changes the outcome.
+
+@run Chi-square test of independence
+    import numpy as np
+    import pandas as pd
+    from scipy.stats import chi2_contingency
+
+    rng = np.random.default_rng(5)
+    n = 600
+    diet = rng.choice(["Diet1", "Diet2", "Diet3"], n)
+    p_sick = np.where(diet == "Diet2", 0.20, 0.38)
+    outcome = (rng.random(n) < p_sick).astype(int)
+    abc = pd.crosstab(outcome, diet)
+    print(abc, "\n")
+
+    chi2, p, dof, expected = chi2_contingency(abc)
+    print("chi-square = %.2f   dof = %d   p-value = %.5f" % (chi2, dof, p))
+    print("Reject Ho (independent)?", p < 0.05)
+
+────────────────────────────────────────
+🟠 9 · Mistakes seen in class — avoid them
+────────────────────────────────────────
+• Mixing data frames in one condition: df.salary.iloc[np.where(df.gender=='Female')] — make sure the column you test comes from the same frame as the column you pull values from.
+• Forgetting .astype(int) after get_dummies: newer pandas returns True/False. Convert to 0/1 before fitting.
+• Forgetting to remove the original text column (drop('gender', axis=1)) before fitting: the model cannot handle words.
+• Reading a dummy coefficient as an absolute value. It is always "compared with the reference level".
+• Reading the intercept literally when 0 is not realistic (0 years of service may be outside the data).
+• Treating a small p-value as proof of cause. It only shows the pattern is unlikely to be luck.
+
+────────────────────────────────────────
+🔵 10 · Practice questions
+────────────────────────────────────────
+Q1. Name the response and predictor types, and the test, for: (a) height vs weight, (b) department vs salary (3 departments), (c) smoker (yes/no) vs lung disease (yes/no).
+Q2. A regression gives salary = 80000 + 900 × yrs + 12000 × Male (reference: Female). What is the predicted salary of a woman with 10 years of service? A man with 10 years?
+Q3. A gender variable has labels Female / Male / Other. How many dummy columns are needed and which label is the reference?
+Q4. pearsonr gives r = −0.82, p = 0.00001. Write the conclusion in one sentence.
+Q5. A logistic regression has coefficient +0.04 for Age. Does older age raise or lower the probability of the outcome? By what factor does one extra year multiply the odds (approximately)?
+Q6. chi2_contingency returns p = 0.31 for Outcome vs DietType. What do you conclude about Ho?
+
+Answers
+A1. (a) both continuous → scatter plot, Pearson correlation or simple regression. (b) categorical predictor, continuous response → box plots; regression with 2 dummy columns (or ANOVA, later). (c) both categorical → crosstab and chi-square test.
+A2. Woman: 80000 + 9000 = 89000. Man: 89000 + 12000 = 101000.
+A3. Three labels → two dummy columns. Reference = first alphabetically = Female.
+A4. Strong negative linear relationship; p < 0.05, so reject Ho — as x increases, y decreases.
+A5. Raises it. exp(0.04) ≈ 1.04, so odds rise by about 4% per year.
+A6. p > 0.05 → fail to reject Ho: no evidence that Outcome depends on DietType.
+
+────────────────────────────────────────
+🟢 11 · One-page cheat sheet
+────────────────────────────────────────
+    pearsonr(x, y)                               r and p for two continuous columns
+    LinearRegression().fit(X, y)                 .coef_  .intercept_  .score(X, y)
+    np.array(x).reshape(-1, 1)                   one feature column for sklearn
+    ssw.ztest(x1, x2)                            compare two group means
+    pd.get_dummies(col, drop_first=True)         k labels -> k-1 dummy columns
+    .astype(int)                                 True/False -> 1/0
+    LogisticRegression().fit(X, y)               binary response; sign of coef = direction
+    pd.crosstab(a, b)                            table of counts
+    chi2_contingency(table)                      statistic, p, dof, expected
+
+• p < 0.05 → reject Ho.
+• Dummy coefficient = difference from the reference level.
+• Intercept = response when numeric predictors are 0 and categories are at the reference level.
+
+────────────────────────────────────────
+🔴 12 · Also on 8 October — reading list
+────────────────────────────────────────
+The afternoon of 8 October moved on to three new algorithms. The reading links shared in the class chat were:
+• Support Vector Machine: https://www.geeksforgeeks.org/machine-learning/support-vector-machine-algorithm/
+• Apriori (association rules): https://www.geeksforgeeks.org/machine-learning/apriori-algorithm/
+• Principal Component Analysis: https://www.geeksforgeeks.org/data-analysis/principal-component-analysis-pca/

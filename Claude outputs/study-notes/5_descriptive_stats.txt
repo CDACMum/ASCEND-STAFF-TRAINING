@@ -1,0 +1,347 @@
+Frequency tables · Mean, median, mode · Weighted mean · Range, IQR, variance, standard deviation · Skewness and kurtosis
+
+On 21 October Sudeep Bhargava went through the three questions you ask of any column of numbers:
+• WHERE is the middle? → mean, median, mode (measures of centre)
+• HOW spread out is it? → range, IQR, variance, standard deviation (measures of spread)
+• WHAT SHAPE is it? → skewness and kurtosis
+
+Examples use the ERPData sheet (MaterialID) and the faithful sheet (eruptions). Every runnable cell uses small numbers you can verify by hand or simulated data with a fixed seed. The statistics note (Statistics & Model Evaluation) and the 5 September IQR note cover the same ideas in more depth; this note keeps to what was taught on the day.
+
+How to read the grades: 🟢 start here · 🔵 core · 🟠 go deeper · 🔴 stretch
+
+    import numpy as np
+    import pandas as pd
+    import matplotlib
+    from matplotlib import pyplot as plt
+    import scipy
+    from scipy import stats
+
+────────────────────────────────────────
+🟢 1 · Describing a categorical column: counts, proportions, percentages
+────────────────────────────────────────
+For a categorical column the "summary" is a frequency table.
+
+    df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='ERPData')
+    np.unique(df.MaterialID)       # the distinct values, in ascending or alphabetical order
+    np.unique(df.MaterialID, return_counts=True)    # TWO arrays: the unique values, and the count of each
+
+    x1 = np.unique(df.MaterialID, return_counts=True)
+    x1[1]                           # only the counts (second array)
+    prop = x1[1] / sum(x1[1])       # proportions (they add up to 1)
+    pct = prop * 100                # percentages (they add up to 100)
+
+    MaterialSummary = pd.DataFrame({'Name': np.unique(df.MaterialID),
+                                    'Counts': x1[1],
+                                    'Proportion': prop,
+                                    'Percentage': pct})
+
+Cumulative totals — the running total up to each position — come from np.cumsum:
+
+    x2 = np.array([4, 3, 6, 2, 7])
+    np.cumsum(x2)      # [ 4  7 13 15 22 ]
+
+@run A frequency table by hand and with numpy
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(21)
+    material = rng.choice(["M101", "M102", "M103", "M104"], 80, p=[.15, .30, .25, .30])
+
+    x1 = np.unique(material, return_counts=True)
+    prop = x1[1] / sum(x1[1])
+    pct = prop * 100
+    MaterialSummary = pd.DataFrame({"Name": x1[0], "Counts": x1[1],
+                                    "Proportion": prop.round(3), "Percentage": pct.round(1)})
+    print(MaterialSummary)
+    print("\nproportions add up to", prop.sum().round(3))
+    print("\ncumsum of [4,3,6,2,7] =", np.cumsum(np.array([4, 3, 6, 2, 7])))
+
+────────────────────────────────────────
+🟢 2 · The mean
+────────────────────────────────────────
+The mean is the balance point: add everything, divide by how many.
+
+    erupt = df.eruptions        # faithful sheet
+    sum(erupt) / len(erupt)
+    np.mean(erupt)              # the same answer
+
+When is the mean the right choice? Two conditions were written on the board:
+• the data should NOT have outliers
+• the distribution should be symmetric
+
+When either fails, the mean gets dragged and stops describing a "typical" value.
+
+────────────────────────────────────────
+🟢 3 · The median
+────────────────────────────────────────
+Sort the numbers; the median is the middle one. With an even count, it is the average of the two middle ones.
+
+    x2 = np.array([4, 3, 6, 2, 7])
+    np.median(x2)          # sorted: 2 3 4 6 7 -> middle = 4
+    np.median(erupt)
+
+The median is not affected by outliers, which is why missing salaries are filled with the median (merge note). In a skewed or outlier-rich column, report the median.
+
+@run Mean vs median when there is an outlier
+    import numpy as np
+
+    salaries = np.array([30, 32, 35, 36, 38, 40])
+    print("without outlier -> mean = %.1f   median = %.1f" % (salaries.mean(), np.median(salaries)))
+    salaries2 = np.append(salaries, 400)
+    print("with 400 added  -> mean = %.1f   median = %.1f" % (salaries2.mean(), np.median(salaries2)))
+    print("\nThe mean jumped; the median barely moved.")
+
+────────────────────────────────────────
+🔵 4 · The mode — and data with two modes
+────────────────────────────────────────
+The mode is the value that occurs most often. NumPy has no mode function, so the class used Counter:
+
+    from collections import Counter
+    Counter(erupt).most_common()
+    # We have two modes - 1.867 and 4.5, each occurring 8 times
+
+Two (or more) peaks = a bimodal (multimodal) column. The faithful geyser has short eruptions near 2 minutes and long ones near 4.5 minutes, so neither the mean nor the median describes either group — here the mode, or better, the histogram, tells the real story. Always look at the shape before trusting one number.
+
+For a categorical column the mode is the only available centre: the most frequent label, such as the MaterialID with the largest count.
+
+@run Mode with Counter
+    from collections import Counter
+
+    values = [2.0, 4.5, 4.5, 1.9, 2.0, 4.5, 3.8, 2.0, 4.5, 2.0]
+    ranked = Counter(values).most_common()
+    print("most common first:", ranked)
+    top = ranked[0][1]
+    print("mode(s):", [v for v, c in ranked if c == top], "each appearing", top, "times")
+
+────────────────────────────────────────
+🔵 5 · The weighted mean
+────────────────────────────────────────
+When each value counts a different number of times (or has a different importance), weight it. The class example gave values with their frequencies:
+
+    values    = np.array([10, 20, 30, 40, 50])
+    frequency = np.array([ 7, 15, 35, 20, 10])
+    sum(values * frequency) / sum(frequency)
+
+Work it out: 10×7 + 20×15 + 30×35 + 40×20 + 50×10 = 70 + 300 + 1050 + 800 + 500 = 2720. Total frequency = 87. Weighted mean = 2720 / 87 = 31.26.
+
+The simple mean of 10, 20, 30, 40, 50 would be 30. The weighted mean is higher than 30 because 30, 40, 50 occur more often than 10 and 20.
+
+@run Weighted mean
+    import numpy as np
+
+    values = np.array([10, 20, 30, 40, 50])
+    frequency = np.array([7, 15, 35, 20, 10])
+    print("weighted mean :", sum(values * frequency) / sum(frequency))
+    print("np.average    :", np.average(values, weights=frequency))
+    print("simple mean   :", values.mean())
+
+────────────────────────────────────────
+🔵 6 · Measuring spread: range and IQR
+────────────────────────────────────────
+Two columns can have the same mean and be completely different. Spread measures say how far the values wander from the centre.
+
+Range
+
+    max(erupt) - min(erupt)
+    np.ptp(erupt)             # "peak to peak", the same thing
+
+• Easy, but it uses only 2 values out of many.
+• It is affected by outliers: one extreme value changes it completely.
+
+Inter-quartile range (IQR)
+
+    np.percentile(erupt, 75) - np.percentile(erupt, 25)
+
+• The width of the middle 50% of the data.
+• It is (practically) NOT affected by outliers: the cell below shows the range jumping from 10 to 190 while the IQR moves only from 4.5 to 5.8.
+
+@run Range vs IQR with one outlier
+    import numpy as np
+
+    x = np.array([10, 12, 13, 15, 16, 18, 20])
+    y = np.append(x, 200)
+    for name, a in [("without outlier", x), ("with outlier 200", y)]:
+        iqr = np.percentile(a, 75) - np.percentile(a, 25)
+        print("%-18s range = %5.0f   IQR = %5.1f" % (name, np.ptp(a), iqr))
+
+────────────────────────────────────────
+🔵 7 · Variance and standard deviation — the formula first
+────────────────────────────────────────
+Both use every value. The idea: for each value, find how far it is from the mean (its deviation), then average the squared deviations.
+
+    Step 1: mean = Σx / n
+    Step 2: deviation of each value = x − mean            (these ALWAYS add up to 0)
+    Step 3: squared deviation = (x − mean)²               (squaring removes the sign)
+    Step 4: sum of squared deviations = SSD
+    Step 5: population variance = SSD / n
+            sample variance     = SSD / (n − 1)
+    Step 6: standard deviation = square root of the variance
+
+In code, as written in class:
+
+    erupt_mean = np.mean(erupt)
+    df['deviation'] = df.eruptions - erupt_mean        # total of this column is always 0
+    df['sqd_deviation'] = (df.eruptions - erupt_mean)**2
+    ssd = sum(df.sqd_deviation)
+    ssd / df.shape[0]          # population variance   -> same as np.var(erupt)
+    ssd / (df.shape[0] - 1)    # sample variance       -> same as np.var(erupt, ddof=1)
+    (ssd / df.shape[0])**0.5          # population std deviation -> np.std(erupt)
+    (ssd / (df.shape[0] - 1))**0.5    # sample std deviation     -> np.std(erupt, ddof=1)
+
+⚠ In the live chat one line was typed as ssd**0.5/(df.shape[0]-1). That divides the square root of SSD by (n−1), which is wrong. The correct form takes the square root of the WHOLE variance: (ssd/(n−1))**0.5, exactly as in the line above.
+
+Using the library:
+
+    np.var(erupt, ddof=1)      # sample variance
+    np.std(erupt, ddof=1)      # sample standard deviation
+
+• ddof=1 means "delta degrees of freedom = 1": divide by n − 1 instead of n. It gives the SAMPLE variance / SD, used when your data is a sample from a bigger population (the usual case).
+• Without ddof (np.var(erupt)) NumPy divides by n: the POPULATION variance.
+• Unit of variance = the SQUARE of the unit of the data (minutes²). Unit of standard deviation = the same as the data (minutes). That is why people quote the standard deviation.
+
+@run Variance and SD by hand, then by numpy
+    import numpy as np
+
+    x = np.array([4, 3, 6, 2, 7])
+    n = len(x)
+    mean = x.mean()
+    dev = x - mean
+    print("mean               :", mean)
+    print("deviations         :", dev.round(1), " sum =", abs(round(dev.sum(), 10)))
+    print("squared deviations :", (dev**2).round(2))
+    ssd = (dev**2).sum()
+    print("SSD                : %.2f" % ssd)
+    print("population variance: %.3f   np.var(x)         = %.3f" % (ssd/n, np.var(x)))
+    print("sample variance    : %.3f   np.var(x, ddof=1) = %.3f" % (ssd/(n-1), np.var(x, ddof=1)))
+    print("sample SD          : %.4f  np.std(x, ddof=1) = %.4f" % ((ssd/(n-1))**0.5, np.std(x, ddof=1)))
+    print("WRONG formula ssd**0.5/(n-1) gives: %.4f" % (ssd**0.5/(n-1)))
+
+────────────────────────────────────────
+🔵 8 · Shape 1: skewness (is the distribution lopsided?)
+────────────────────────────────────────
+Skewness measures symmetry.
+
+    Peak of the distribution   Tail   Name                      Skewness   Example from class
+    on the LEFT                right  skewed to the right       > 0        salary distribution in a company — many small salaries, few big ones
+    on the RIGHT               left   skewed to the left        < 0        age of people going to Parliament — most are older, a few are young
+    in the middle, symmetric          symmetric                 ≈ 0        heights of adults
+
+The direction is named after the TAIL, not the peak. Salary: the peak is on the left (smaller values have a high frequency) and the long tail stretches right, so it is right-skewed with positive skewness. A quick check: in a right-skewed column the mean is pulled above the median.
+
+@svg skew
+
+The three histograms built in class with np.repeat (value, how many times):
+
+    x1 = np.repeat([1,2,3,4,5,6,7,8,9,10], [5,10,150,140,120,100,80,60,40,20])     # peak on the left
+    x2 = np.repeat([1,2,3,4,5,6,7,8,9,10], [20,40,60,80,100,120,140,150,10,5])     # peak on the right
+    x3 = np.repeat([1,2,3,4,5,6,7,8,9,10,11], [2,5,10,20,30,40,30,20,10,5,2])      # symmetric
+    plt.hist(x1)
+    scipy.stats.skew(x1)
+
+@run Skewness of the three class histograms
+    import numpy as np
+    from scipy import stats
+
+    x1 = np.repeat([1,2,3,4,5,6,7,8,9,10], [5,10,150,140,120,100,80,60,40,20])
+    x2 = np.repeat([1,2,3,4,5,6,7,8,9,10], [20,40,60,80,100,120,140,150,10,5])
+    x3 = np.repeat([1,2,3,4,5,6,7,8,9,10,11], [2,5,10,20,30,40,30,20,10,5,2])
+
+    for name, x, text in [("x1", x1, "peak left  -> right skew"),
+                          ("x2", x2, "peak right -> left skew"),
+                          ("x3", x3, "symmetric")]:
+        print("%s  skewness = %6.3f   mean = %.2f  median = %.1f   (%s)" %
+              (name, stats.skew(x), x.mean(), np.median(x), text))
+
+────────────────────────────────────────
+🔵 9 · Shape 2: kurtosis (how sharp is the peak?)
+────────────────────────────────────────
+Kurtosis measures the sharpness of the peak compared with the normal (bell) curve. In scipy's convention a normal curve scores 0:
+
+• kurtosis = 0 → the sharpness of the normal curve
+• kurtosis positive → sharper peak than normal (and heavier tails)
+• kurtosis negative → flatter than normal
+
+The class examples:
+
+    x3 = np.repeat([1,2,3,4,5,6,7,8,9,10,11], [2,5,10,20,30,40,30,20,10,5,2])      # close to normal
+    scipy.stats.kurtosis(x3)
+
+    x1 = np.repeat([1,2,3,4,5,6,7,8,9,10], [5,10,15,20,400,20,15,10,5,2])          # very sharp peak at 5
+    scipy.stats.kurtosis(x1)
+
+    x2 = np.repeat([1,2,3,4,5,6,7,8,9,10], [20,25,25,30,35,30,25,25,20,20])        # nearly flat
+    scipy.stats.kurtosis(x2)
+
+(Note that the names x1, x2, x3 are reused in the class for different arrays. Use a new name each time in your own notebook, or re-run the cell that defines the array you need.)
+
+@run Kurtosis of the three shapes
+    import numpy as np
+    from scipy import stats
+
+    near_normal = np.repeat([1,2,3,4,5,6,7,8,9,10,11], [2,5,10,20,30,40,30,20,10,5,2])
+    sharp       = np.repeat([1,2,3,4,5,6,7,8,9,10], [5,10,15,20,400,20,15,10,5,2])
+    flat        = np.repeat([1,2,3,4,5,6,7,8,9,10], [20,25,25,30,35,30,25,25,20,20])
+
+    for name, x in [("near normal", near_normal), ("sharp peak", sharp), ("flat", flat)]:
+        print("%-12s kurtosis = %6.3f" % (name, stats.kurtosis(x)))
+    print("\npositive = sharper than normal, negative = flatter than normal")
+
+────────────────────────────────────────
+🟠 10 · Putting it together: a describing-a-column routine
+────────────────────────────────────────
+When you meet a new numeric column, answer in this order:
+• 1. Plot it (histogram + box plot): one hump or two? symmetric? outliers?
+• 2. Centre: mean if symmetric and clean; median if skewed or outliers; mode if categorical or multi-modal.
+• 3. Spread: SD with the mean; IQR with the median.
+• 4. Shape: skewness (direction), kurtosis (peakedness).
+
+@run One routine for a whole column
+    import numpy as np
+    from scipy import stats
+
+    rng = np.random.default_rng(4)
+    col = np.append(rng.gamma(2.0, 20000, 300), [400000, 450000])   # salary-like, right skewed, 2 outliers
+
+    q1, q3 = np.percentile(col, [25, 75])
+    print("n        =", len(col))
+    print("mean     = %.0f   median = %.0f" % (col.mean(), np.median(col)))
+    print("SD       = %.0f   IQR    = %.0f" % (col.std(ddof=1), q3 - q1))
+    print("range    = %.0f" % np.ptp(col))
+    print("skewness = %.2f   kurtosis = %.2f" % (stats.skew(col), stats.kurtosis(col)))
+    print("mean > median and skew > 0  ->  right skewed: quote the MEDIAN and the IQR")
+
+────────────────────────────────────────
+🔵 11 · Practice questions
+────────────────────────────────────────
+Q1. Data: 5, 8, 8, 9, 12, 14, 40. Find the mean, median and mode. Which would you quote?
+Q2. Values 2, 4, 6 with frequencies 1, 3, 6. Weighted mean?
+Q3. For x = 2, 4, 6, 8: find the population variance and the sample variance.
+Q4. A column has skewness −0.9. Describe the shape and say where the peak is.
+Q5. Kurtosis (scipy) of a column is −1.1. What does that tell you?
+Q6. Why is the standard deviation preferred over the variance when reporting?
+Q7. Which spread measure would you report for a column with outliers?
+
+Answers
+A1. Mean = 96/7 = 13.71; median = 9; mode = 8. Quote the median (9): 40 is an outlier that drags the mean.
+A2. (2×1 + 4×3 + 6×6) / 10 = (2 + 12 + 36)/10 = 5.0.
+A3. Mean = 5; deviations −3, −1, 1, 3; squares 9, 1, 1, 9; SSD = 20. Population variance = 20/4 = 5; sample variance = 20/3 = 6.67.
+A4. Skewed to the left (negative skew): the peak is on the right and the long tail on the left.
+A5. Flatter than a normal curve.
+A6. It has the same unit as the data.
+A7. The IQR (with the median).
+
+────────────────────────────────────────
+🟢 12 · One-page cheat sheet
+────────────────────────────────────────
+    np.unique(x, return_counts=True)    frequency table
+    np.cumsum(x)                        running total
+    np.mean / np.median / Counter(x).most_common()    centre
+    np.average(values, weights=freq)    weighted mean
+    np.ptp(x)                           range
+    np.percentile(x,75) - np.percentile(x,25)         IQR
+    np.var(x, ddof=1)   np.std(x, ddof=1)             sample variance, SD
+    stats.skew(x)       > 0 right tail, < 0 left tail
+    stats.kurtosis(x)   > 0 sharper, < 0 flatter than normal
+
+• Symmetric, no outliers → mean and SD.
+• Skewed or outliers → median and IQR.

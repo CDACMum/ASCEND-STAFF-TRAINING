@@ -1,0 +1,329 @@
+Arrays · Indexing and slicing · reshape · Conditions with np.where · Reading Excel · loc and iloc · drop · concat
+
+Sudeep Bhargava started the Python data tools from the ground up. These notes follow the board and the code he pasted in the class chat, with the same names (a1, ind, df, mydf, MWH-2 …). All runnable cells use small arrays you can check by hand or simulated ERP-style data with a fixed seed, so every result below can be reproduced in your browser.
+
+How to read the grades: 🟢 start here · 🔵 core · 🟠 go deeper · 🔴 stretch
+
+────────────────────────────────────────
+🟢 1 · The two libraries and their data structures
+────────────────────────────────────────
+Every notebook of this course starts with the same imports:
+
+    import numpy as np
+    import pandas as pd
+    import matplotlib
+    from matplotlib import pyplot as plt
+
+What Python already gives you (built-in containers): list, tuple, dictionary, set.
+
+What the two libraries add:
+• NumPy → ndarray. The "nd" means n-dimensional: a block of numbers of the same type in 1, 2 or more dimensions. Fast arithmetic on all elements at once.
+• pandas → Series (one labelled column) and DataFrame (a table of columns, like an Excel sheet).
+
+Rule of thumb: raw numbers and maths → NumPy; labelled tables from Excel/CSV → pandas. A DataFrame column is built on top of NumPy, which is why np.where works on df columns later in these notes.
+
+────────────────────────────────────────
+🟢 2 · Creating and indexing an array
+────────────────────────────────────────
+    a1 = np.array([3, 6, 5, 7, 8, 9, 1, 2])   # creating an array
+    type(a1)     # to know the type of data structure
+    len(a1)      # number of elements
+    a1[3]        # extract the fourth element
+
+Python counts from 0. The first element is a1[0], the fourth is a1[3].
+
+Picking several positions at once — put the positions in a list inside the brackets:
+
+    a1[[2, 5, 6]]   # extracts the elements at index 2, 5 and 6
+
+Slicing — start:stop, where the stop index is NOT included:
+
+    a1[2:5]    # index 2, 3, 4 (= 5 − 1)
+    a1[2:]     # from index 2 up to the end
+    a1[:4]     # from the start up to index 3 (= 4 − 1)
+
+@run Indexing and slicing, check against the numbers above
+    import numpy as np
+    a1 = np.array([3, 6, 5, 7, 8, 9, 1, 2])
+    print("type          :", type(a1))
+    print("len           :", len(a1))
+    print("a1[3]         :", a1[3])
+    print("a1[[2,5,6]]   :", a1[[2, 5, 6]])
+    print("a1[2:5]       :", a1[2:5])
+    print("a1[2:]        :", a1[2:])
+    print("a1[:4]        :", a1[:4])
+
+────────────────────────────────────────
+🔵 3 · Two-dimensional arrays and reshape
+────────────────────────────────────────
+    a2 = np.array([[2, 4, 5, 6], [1, 6, 5, 7]])   # 2 rows × 4 columns
+
+    a3 = np.array([4, 3, 5, 6, 8, 7, 9, 2])
+    a4 = a3.reshape(4, 2)     # 4 rows and 2 columns
+    a5 = a3.reshape(-1, 1)    # n rows and 1 column
+    a6 = a3.reshape(2, 4)     # 2 rows and 4 columns
+
+• reshape never changes the values or their order — only how they are cut into rows and columns.
+• The product of rows × columns must equal the number of elements (8 here).
+• −1 means "let Python work out this number". With reshape(-1, 1) the −1 becomes 8, the number of elements of a3. You will use reshape(-1, 1) every time you give a single feature column to scikit-learn.
+
+@run reshape
+    import numpy as np
+    a3 = np.array([4, 3, 5, 6, 8, 7, 9, 2])
+    print("shape of a3 :", a3.shape)
+    print("reshape(4,2):\n", a3.reshape(4, 2))
+    print("reshape(2,4):\n", a3.reshape(2, 4))
+    print("reshape(-1,1) gives shape", a3.reshape(-1, 1).shape)
+    a2 = np.array([[2, 4, 5, 6], [1, 6, 5, 7]])
+    print("a2 shape    :", a2.shape, "(2 rows, 4 columns)")
+
+────────────────────────────────────────
+🔵 4 · Conditions and np.where — the heart of these two days
+────────────────────────────────────────
+A comparison on an array is applied to EVERY element and returns an array of True / False:
+
+    a1 = np.array([3, 6, 5, 7, 8, 9, 1, 2])
+    a1 <= 4          # True where the condition is met, False where it is not
+    ind = np.where(a1 <= 4)    # the INDICES where the condition is met
+
+np.where returns a tuple. Index 0 of the tuple holds the array of positions, which is why you will always see ind[0].
+
+Three questions, three answers (written on the board as Quest1–3):
+
+    Quest1: what are the indices of the values which are <= 4
+    Quest2: how many values are <= 4
+    Quest3: what are the values which are <= 4
+
+    ind = np.where(a1 <= 4)
+    ind[0]             # Q1: the indices
+    len(ind[0])        # Q2: how many
+    (a1 <= 4).sum()    # Q2 again: True counts as 1, so sum = count
+    a1[ind[0]]         # Q3: the values at those indices
+    a1[a1 <= 4]        # Q3 again: directly with the True/False mask
+
+@run The three questions
+    import numpy as np
+    a1 = np.array([3, 6, 5, 7, 8, 9, 1, 2])
+    print("mask      :", a1 <= 4)
+    ind = np.where(a1 <= 4)
+    print("Q1 indices:", ind[0])
+    print("Q2 count  :", len(ind[0]), "  or  ", (a1 <= 4).sum())
+    print("Q3 values :", a1[ind[0]], "  or  ", a1[a1 <= 4])
+
+────────────────────────────────────────
+🔵 5 · More than one condition: AND, OR
+────────────────────────────────────────
+Logical AND first, with plain True/False values (15 October):
+
+    p1 = True
+    p2 = False
+    p3 = True
+    p1 & p2    # AND  -> False (both must be True)
+    p1 & p3    # AND  -> True
+
+Rule for the combined condition: write each condition in its OWN round brackets and join them with & (AND) or | (OR). The brackets are not optional.
+
+    a1 = np.array([3, 6, 5, 7, 9, 8, 7, 5, 4, 6, 5, 7, 10, 3])
+    # a1 >= 4 and a1 <= 7
+    ind = np.where((a1 >= 4) & (a1 <= 7))
+    # (array([ 1,  2,  3,  6,  7,  8,  9, 10, 11]),)
+    len(ind[0])                        # number of values meeting BOTH criteria
+    ((a1 >= 4) & (a1 <= 7)).sum()      # same count, without np.where
+    a1[ind[0]]                         # values that meet both criteria
+    a1[(a1 >= 4) & (a1 <= 7)]          # same values, with the mask
+
+🟠 Why not the words "and" / "or"? Python's and/or work on single True/False values. Array conditions need the element-by-element operators & and |.
+
+@run AND, OR and the bracket rule
+    import numpy as np
+    a1 = np.array([3, 6, 5, 7, 9, 8, 7, 5, 4, 6, 5, 7, 10, 3])
+    ind = np.where((a1 >= 4) & (a1 <= 7))
+    print("indices          :", ind[0])
+    print("count            :", len(ind[0]))
+    print("values           :", a1[ind[0]])
+    print("OR example (<4 or >9):", a1[(a1 < 4) | (a1 > 9)])
+    try:
+        np.where(a1 >= 4 & a1 <= 7)
+    except Exception as e:
+        print("without brackets ->", type(e).__name__)
+
+────────────────────────────────────────
+🟢 6 · Where is my file? The working directory
+────────────────────────────────────────
+pd.read_excel('CDAC_DataBook.xlsx') only works if Python is "standing" in the folder that holds the file.
+
+    import os
+    os.getcwd()                                  # where am I now?
+    os.chdir(r'C:\\Users\\Sudeep Bhargava\\Downloads')   # move to the folder with the file
+
+Where students were working: VS Code (set the folder or use chdir); Google Colab (the working directory is /content; upload the file with the left-hand Files panel). Same code, different location.
+
+────────────────────────────────────────
+🔵 7 · From Excel to DataFrame and first look
+────────────────────────────────────────
+    df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='ERPData')
+    df.shape      # (rows, columns) — first number is rows, second is columns
+    df.head()     # first five rows
+    df.tail()     # last five rows
+    df.columns    # names of all columns
+    x1 = df.Quantity    # one column, as a Series
+
+The ERPData sheet is a log of consignments with a MaterialID, a Location (warehouses such as MWH-1, MWH-2 …) and a Quantity.
+
+Find the location of the heaviest consignment:
+
+    ind = np.where(df.Quantity == max(df.Quantity))
+    df.Location[ind[0]]      # location of the consignment with highest weight
+    df.MaterialID[ind[0]]    # MaterialID of that consignment
+
+This is the same np.where pattern as on a1, only the array is now a DataFrame column.
+
+@run A tiny ERP table: shape, head, heaviest consignment
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(21)
+    n = 40
+    df = pd.DataFrame({
+        "MaterialID": rng.choice(["M101", "M102", "M103", "M104"], n),
+        "Location": rng.choice(["MWH-1", "MWH-2", "MWH-3"], n),
+        "Quantity": rng.integers(50, 500, n),
+    })
+    print("shape:", df.shape)
+    print(df.head(), "\n")
+    print("columns:", list(df.columns))
+
+    ind = np.where(df.Quantity == max(df.Quantity))
+    print("heaviest quantity:", max(df.Quantity))
+    print("its location     :", df.Location[ind[0]].tolist())
+    print("its material     :", df.MaterialID[ind[0]].tolist())
+
+────────────────────────────────────────
+🔵 8 · Selecting rows: iloc, loc and reset_index
+────────────────────────────────────────
+Build a separate table for one warehouse:
+
+    ind = np.where(df.Location == 'MWH-2')
+    mydf = df.iloc[ind[0]]      # only the MWH-2 rows
+
+Now there are two ways to pick rows, and the difference matters:
+
+• iloc = by POSITION (1st row, 2nd row …), always starts at 0 and counts the rows as they are now.
+• loc = by LABEL — the number printed at the left of the row, i.e. the row's index label.
+
+    mydf.iloc[[0, 2]]     # the first and the third row of mydf
+    mydf.loc[[2, 8]]      # the rows whose LABEL is 2 and 8; error if these labels are not found
+
+A student (Himanshu) spotted that line 106 of the class file should say loc, not iloc — exactly this difference. After filtering, the labels of mydf are the ORIGINAL row numbers of df (for example 3, 8, 11 …), so mydf.iloc[[2, 8]] and mydf.loc[[2, 8]] are not the same thing.
+
+The cure when you want labels and positions to agree:
+
+    mydf = df.iloc[ind[0]].reset_index(drop=True)
+    # labels now run 0, 1, 2 … so labels and positions match
+
+drop=True throws away the old labels. Without it, the old index would be kept as an extra column.
+
+@run iloc vs loc after filtering
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(21)
+    n = 40
+    df = pd.DataFrame({
+        "MaterialID": rng.choice(["M101", "M102", "M103", "M104"], n),
+        "Location": rng.choice(["MWH-1", "MWH-2", "MWH-3"], n),
+        "Quantity": rng.integers(50, 500, n),
+    })
+
+    ind = np.where(df.Location == "MWH-2")
+    mydf = df.iloc[ind[0]]
+    print("labels of mydf:", mydf.index.tolist()[:8], "...\n")
+    print("iloc[[0,2]] -> positions 0 and 2:\n", mydf.iloc[[0, 2]], "\n")
+    lab = mydf.index.tolist()[:2]
+    print("loc[%s] -> labels:\n" % lab, mydf.loc[lab], "\n")
+    try:
+        mydf.loc[[1000]]
+    except KeyError:
+        print("loc with a label that does not exist -> KeyError")
+
+    mydf = df.iloc[ind[0]].reset_index(drop=True)
+    print("after reset_index labels:", mydf.index.tolist()[:8], "...")
+
+────────────────────────────────────────
+🔵 9 · Removing and stacking rows
+────────────────────────────────────────
+drop removes the rows with the given LABELS and returns a new DataFrame:
+
+    df2 = df.drop(ind[0])    # deletes the rows whose labels are in ind[0], saves the rest as df2
+
+df itself is unchanged. The result df2 contains all rows EXCEPT MWH-2 — a quick way to say "everything except this location".
+
+concat stacks tables on top of each other:
+
+    df1 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Pune')
+    df2 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Mumbai')
+    master_df = pd.concat([df1, df2]).reset_index(drop=True)
+    # puts all the rows of df2 under the rows of df1
+    # works when the number and names of columns match in both df1 and df2
+
+Always follow concat with reset_index(drop=True), otherwise the two blocks each restart their labels at 0 and you get duplicate labels.
+
+Merging by common columns (pd.merge) was the next topic — see the note for 15 and 16 October.
+
+@run drop and concat
+    import numpy as np
+    import pandas as pd
+
+    df = pd.DataFrame({"Location": ["A", "B", "A", "C", "B"], "Quantity": [10, 20, 30, 40, 50]})
+    ind = np.where(df.Location == "A")
+    print("drop the A rows:\n", df.drop(ind[0]), "\n")
+
+    d1 = pd.DataFrame({"Subject": ["Maths", "Stats"], "Grade": ["A", "B"]})
+    d2 = pd.DataFrame({"Subject": ["Python"], "Grade": ["A"]})
+    print("concat, labels not reset:\n", pd.concat([d1, d2]), "\n")
+    print("concat + reset_index(drop=True):\n", pd.concat([d1, d2]).reset_index(drop=True))
+
+────────────────────────────────────────
+🟠 10 · Typical errors and fixes
+────────────────────────────────────────
+• Forgetting the [0] in ind[0]. np.where returns a tuple; the positions are inside it.
+• Writing a1 >= 4 & a1 <= 7 without brackets → error. Always (a1 >= 4) & (a1 <= 7).
+• Using iloc with labels or loc with positions after filtering. Run reset_index(drop=True) after every filter you plan to index again.
+• Reading a file that Python cannot find. Check os.getcwd() first.
+• Using slicing end-points as inclusive. a1[2:5] stops at index 4.
+
+────────────────────────────────────────
+🔵 11 · Practice questions
+────────────────────────────────────────
+Use b = np.array([12, 5, 8, 20, 3, 15, 9, 7]).
+Q1. What is b[2:6]?  What is b[[0, 3, 7]]?
+Q2. Write one line that gives the number of elements of b that are greater than 8.
+Q3. Which indices have values that are less than 6 OR greater than 14?
+Q4. What is the shape of b.reshape(-1, 2)?
+Q5. A table t has 5 rows with labels 10, 11, 12, 13, 14. What does t.iloc[[1]] return and what does t.loc[[1]] return?
+Q6. df has 200 rows. df.shape gives what? After t = df.iloc[np.where(df.Quantity > 400)[0]] and 14 rows qualify, what is t.shape if df has 6 columns?
+
+Answers
+A1. b[2:6] = [8, 20, 3, 15]; b[[0,3,7]] = [12, 20, 7].
+A2. (b > 8).sum() → 4 (values 12, 20, 15, 9).
+A3. np.where((b < 6) | (b > 14))[0] → indices 1 (5), 3 (20), 4 (3), 5 (15).
+A4. (4, 2).
+A5. iloc[[1]] returns the second row (label 11); loc[[1]] raises KeyError because label 1 does not exist.
+A6. (200, 6); t.shape = (14, 6).
+
+────────────────────────────────────────
+🟢 12 · One-page cheat sheet
+────────────────────────────────────────
+    np.array([..])                    make an array
+    a[i]   a[[i,j]]   a[i:j]          one, several, slice (stop excluded)
+    a.reshape(r, c)   reshape(-1, 1)  re-cut into rows and columns
+    np.where(cond)[0]                 indices where the condition is True
+    (c1) & (c2)   (c1) | (c2)         AND, OR on arrays — brackets required
+    (cond).sum()                      how many True
+    a[cond]                           values where True
+    pd.read_excel(file, sheet_name=)  Excel sheet -> DataFrame
+    df.shape  head()  tail()  columns look at the table
+    df.iloc[[i,j]]   df.loc[[a,b]]    by position / by label
+    .reset_index(drop=True)           make labels 0,1,2…
+    df.drop(labels)                   remove rows
+    pd.concat([d1, d2])               stack tables

@@ -1,0 +1,37 @@
+00:35:47	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name = 'Health')
+00:40:02	Sudeep Bhargava:	df1 = pd.melt(df,id_vars=['Country','Disease'],var_name='Year',value_name='Cases')
+00:58:00	Debmalya Paul:	So sir, the conversion of tall dataframe to broad know as pivot_table right?
+01:02:42	Sudeep Bhargava:	df2 = df1.pivot_table(index=['Country','Year'], columns='Disease',values='Cases').reset_index().rename_axis(columns=None)
+01:05:15	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name = 'Health')df1 = pd.melt(df,id_vars=['Country','Disease'],var_name='Year',value_name='Cases')df2 = df1.pivot_table(index=['Country','Year'], columns='Disease',values='Cases').reset_index().rename_axis(columns=None)# df to df1 is converting a broad DF to a tall one# The different columns for the multiple years have been converted to two columns - one column having# the name of the original columns and the second column having the values written under those columns# df1 to df2 is convereting a tall DF to a broad one# one column in df1 having multiple values gets converted to multiple columns in df2 with # one column for each unique value. The values written under those columns coming from another column# in df1
+01:07:09	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name = 'ERPData')
+01:09:13	Sudeep Bhargava:	df1 = df.pivot_table(index='Location',columns='MaterialID',values='Quantity').reset_index()
+01:12:08	Sudeep Bhargava:	df1 = df.pivot_table(index='Location',columns='MaterialID',values='Quantity',aggfunc='sum').reset_index().rename_axis(columns=None)
+01:14:21	Aniket Jadhav:	working sir
+01:14:35	Debmalya Paul:	Done sir
+01:15:33	Aniket Jadhav:	sir can we fill NaN with 0 here
+01:16:08	Sudeep Bhargava:	Different keywords that can be given as a option for aggfunc # sum, count, mean, std, var
+01:17:12	Sudeep Bhargava:	# Different keywords that can be given as a option for aggfunc # sum --> total# count --> frequency# mean --> average # std --> std deviation# var --> variance
+01:18:20	Aniket Jadhav:	thank you sir
+01:20:48	Himanshu Nigam:	maybe you have only used head?
+01:22:08	Sudeep Bhargava:	df1 = df.pivot_table(index='Location',columns='MaterialID',values='Quantity',aggfunc='sum',fill_value=0,margins=True).reset_index().rename_axis(columns=None)
+01:25:58	Aniket Jadhav:	No Sir
+01:28:46	Sudeep Bhargava:	pd.crosstab(df.MaterialID,df.Location,values=df.Quantity,aggfunc='sum').reset_index().rename_axis(columns=None)
+01:30:07	Himanshu Nigam:	Sir, my net had issue, can you plz tell again usage of crosstab?
+01:32:35	Himanshu Nigam:	okay sir, thank you
+01:36:21	Sudeep Bhargava:	import matplotlibfrom matplotlib import pyplot as pltimport seaborn as sns
+01:42:01	Sudeep Bhargava:	df_counts = df.MaterialID.value_counts().reset_index()
+01:45:30	Sudeep Bhargava:	# UNIVARIATE - single variable# Categorcial data# bar chartnp.unique(df.MaterialID)  # unique values of a categorical variabledf_counts = df.MaterialID.value_counts().reset_index()df_sorted = df_counts.sort_values('MaterialID')
+01:46:47	Sagar Jadhav:	can we sort countwise?
+01:49:55	Sudeep Bhargava:	df_sorted = df.sort_values('Quantity').reset_index(drop=True)  # ararnges the rows of the data frame in the increasing order of Quantitydf_sorted = df.sort_values('Quantity', ascending=False).reset_index(drop=True)  # ararnges the rows of the data frame in the decreasing order of Quantity
+01:54:33	Sudeep Bhargava:	df_sorted = df.sort_values(['MaterialID','Location','Quantity'], ascending=[True,False,False])
+01:55:33	Sudeep Bhargava:	df_sorted = df.sort_values(['MaterialID','Location','Quantity'], ascending=[True,False,False])# first level sorting on MaterialID in the ascending order# second level sorting on Location in the descending order# third level sorting on Quantity in the descending order
+02:03:12	Sudeep Bhargava:	# UNIVARIATE - single variable# Categorcial data# bar chartnp.unique(df.MaterialID)  # unique values of a categorical variabledf_counts = df.MaterialID.value_counts().reset_index()df_countsdf_counts.columns = ['MaterialID', 'Counts']df_sorted = df_counts.sort_values('MaterialID')plt.bar(df_sorted.MaterialID,df_sorted.Counts)# MaterialIDs in the ascending order on x axis and counts on y axisplt.bar(df_counts.MaterialID,df_counts.Counts)# MaterialIDs on x axis and counts in decreasing order on y axis
+02:08:58	Sudeep Bhargava:	# Seabornsns.barplot(x=df_sorted.MaterialID,y=df_sorted.Counts)sns.barplot(x=df_counts.MaterialID,y=df_counts.Counts)# Pie chart with Matplotlibplt.pie(labels=df_counts.MaterialID,x=df_counts.Counts)
+02:15:07	Sudeep Bhargava:	dfnew = df.pivot_table(index='MaterialID', columns='Location', values='Quantity',aggfunc='count').reset_index().rename_axis(columns=None)dfnew.plot(kind='bar')
+02:18:10	Sudeep Bhargava:	dfnew = df.pivot_table(index='MaterialID', columns='Location', values='Quantity',aggfunc='count').rename_axis(columns=None)dfnew.plot(kind='bar')
+02:23:09	Sudeep Bhargava:	sns.barplot(x='MaterialID',y='Quantity',hue='Location', data=df, ci=None, estimator=np.size)
+02:31:05	Sudeep Bhargava:	# Stacked bar chart with Matplotlibdfnew = df.pivot_table(index='MaterialID', columns='Location', values='Quantity',aggfunc='count').reset_index().rename_axis(columns=None)dfnew.plot.bar(x='MaterialID',y=dfnew.columns[1:6],stacked=True)
+02:36:50	Debmalya Paul:	Okay sir, thanks
+02:37:14	Rahul Chaudhari:	Sir can you please share console output
+02:37:18	Shubham Wadhave:	Thank you sir
+02:37:29	Rahul Chaudhari:	Ok

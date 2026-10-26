@@ -1,0 +1,385 @@
+merge (joins) · Missing values · groupby · melt · pivot_table · crosstab · sort_values
+
+These notes cover the second half of the pandas teaching by Sudeep Bhargava: how to join two tables, what to do when the join leaves holes, how to summarise by group, and how to turn a wide table into a tall one and back. The class used CDAC_DataBook.xlsx; the runnable cells here build tiny tables of the same shape so you can see every row and check the logic by hand.
+
+How to read the grades: 🟢 start here · 🔵 core · 🟠 go deeper · 🔴 stretch
+
+────────────────────────────────────────
+🟢 1 · Two ways to combine tables
+────────────────────────────────────────
+• concat — STACK tables (rows under rows). Use it when the tables have the same columns, for example the Pune sheet and the Mumbai sheet of the same report. pd.concat([df1, df2]).reset_index(drop=True)
+• merge — MATCH rows side by side using a common column (a key). Use it when the tables hold different facts about the same things, for example Salary in one table and Department in another, tied together by EmpID.
+
+The faculty answer to the question "is this similar to SQL joins, sir?" was yes: pd.merge is a join. The words inner, outer, left and right mean exactly what they mean in SQL.
+
+────────────────────────────────────────
+🔵 2 · pd.merge — choosing the key with on
+────────────────────────────────────────
+Two small tables from the class data book. df1 is the Pune sheet, df2 the Mumbai sheet; each lists a Subject, its Grade and the trainer Name.
+
+    df1 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Pune')
+    df2 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Mumbai')
+
+    pd.merge(df1, df2, on='Subject')
+    pd.merge(df1, df2, on=['Subject', 'Grade'])
+    pd.merge(df1, df2, on=['Subject', 'Grade', 'Name'])
+
+What each line asks:
+• on='Subject' → keep subjects found in BOTH tables.
+• on=['Subject','Grade'] → BOTH Subject AND Grade must match. A subject offered in both cities but with different grades disappears.
+• on=['Subject','Grade','Name'] → Subject AND Grade AND Name must all match. If no row satisfies all three, you get an EMPTY DataFrame.
+• If you leave on out, pandas uses ALL the column names the two tables have in common.
+
+When the other columns have the same name in both tables (Grade and Name here), pandas keeps both and adds suffixes _x (left table) and _y (right table).
+
+@run merge with different keys
+    import pandas as pd
+
+    df1 = pd.DataFrame({"Subject": ["Maths", "Stats", "Python", "ML"],
+                        "Grade":   ["A", "B", "A", "B"],
+                        "Name":    ["Ravi", "Asha", "Kiran", "Meera"]})
+    df2 = pd.DataFrame({"Subject": ["Stats", "Python", "SQL", "Maths"],
+                        "Grade":   ["B", "B", "A", "A"],
+                        "Name":    ["Dev", "Neha", "Om", "Isha"]})
+
+    print("on Subject:\n", pd.merge(df1, df2, on="Subject"), "\n")
+    print("on Subject + Grade:\n", pd.merge(df1, df2, on=["Subject", "Grade"]), "\n")
+    print("on Subject + Grade + Name:\n", pd.merge(df1, df2, on=["Subject", "Grade", "Name"]))
+
+────────────────────────────────────────
+🔵 3 · The how option: inner, outer, left, right
+────────────────────────────────────────
+    pd.merge(df1, df2, on='Subject', how='inner')    # default
+    pd.merge(df1, df2, on='Subject', how='outer')
+    pd.merge(df1, df2, on='Subject', how='left')
+    pd.merge(df1, df2, on='Subject', how='right')
+
+    how       Keeps                                         Think of it as
+    inner     keys present in BOTH tables (the default)     AND
+    outer     keys present in EITHER table                  OR
+    left      every key of df1 (the table named first);     "df1 is the boss"
+              df2-only keys do not appear
+    right     every key of df2 (the table named second);    "df2 is the boss"
+              df1-only keys do not appear
+
+Rows that exist on only one side get NaN (missing) in the other table's columns.
+
+@run inner, outer, left, right side by side
+    import pandas as pd
+
+    df1 = pd.DataFrame({"Subject": ["Maths", "Stats", "Python", "ML"],
+                        "TrainerPune": ["Ravi", "Asha", "Kiran", "Meera"]})
+    df2 = pd.DataFrame({"Subject": ["Stats", "Python", "SQL", "Maths"],
+                        "TrainerMumbai": ["Dev", "Neha", "Om", "Isha"]})
+
+    for how in ["inner", "outer", "left", "right"]:
+        out = pd.merge(df1, df2, on="Subject", how=how)
+        print("how = %s  (%d rows)" % (how, len(out)))
+        print(out, "\n")
+
+────────────────────────────────────────
+🔵 4 · Merge on the shared columns, then handle the holes
+────────────────────────────────────────
+On 16 October a Salary table and a Deptt table were merged. Both have Name and EmpID, so those two columns are the key automatically.
+
+    df1 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Salary')
+    df2 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Deptt')
+    pd.merge(df1, df2)                  # key = Name AND EmpID, how = inner
+    pd.merge(df1, df2, how='outer')     # key present in either table
+
+With the outer merge:
+• a person in df1 but not df2 → Deptt is NaN
+• a person in df2 but not df1 → Salary is NaN
+
+Find where Salary is missing, and split the table in two:
+
+    df3 = pd.merge(df1, df2, how='outer')
+    ind = np.where(df3.Salary.isnull())      # indices of rows with a missing Salary
+    df3B = df3.iloc[ind[0]]                  # all rows with a missing Salary
+    df3A = df3.drop(ind[0])                  # rows with NO missing Salary
+
+────────────────────────────────────────
+🔵 5 · Filling missing values with fillna
+────────────────────────────────────────
+Four fillers were demonstrated:
+
+    df3.Salary = df3.Salary.fillna(df3.Salary.median())   # median of the column
+    df3.Salary = df3.Salary.fillna(60)                    # a fixed number
+    df3.Deptt = df3.Deptt.fillna(df3.Deptt.mode()[0])     # the most frequent label (mode)
+    df3.Deptt = df3.Deptt.fillna('Overheads')             # a fixed label
+
+How to choose:
+• Numeric column → median (or mean). The median is preferred because it is NOT pulled by outliers; the mean is.
+• Text/category column → mode (most common label), or an agreed label such as 'Overheads' that explains why the value is missing.
+• Fixed number such as 60 → only when the business has a rule for it.
+• mode() returns a Series (there can be ties), so you take the first with [0].
+
+@run outer merge, find the holes, fill them
+    import numpy as np
+    import pandas as pd
+
+    sal = pd.DataFrame({"Name": ["Amit", "Beena", "Chetan", "Divya"],
+                        "EmpID": [101, 102, 103, 104],
+                        "Salary": [50, 70, 60, 80]})
+    dep = pd.DataFrame({"Name": ["Amit", "Beena", "Eshan", "Farah"],
+                        "EmpID": [101, 102, 105, 106],
+                        "Deptt": ["IT", "HR", "IT", "IT"]})
+
+    print("inner:\n", pd.merge(sal, dep), "\n")
+    df3 = pd.merge(sal, dep, how="outer")
+    print("outer:\n", df3, "\n")
+
+    ind = np.where(df3.Salary.isnull())
+    print("rows with missing Salary:", ind[0])
+    df3B = df3.iloc[ind[0]]
+    df3A = df3.drop(ind[0])
+    print("df3A (complete):", len(df3A), "rows;  df3B (missing):", len(df3B), "rows\n")
+
+    df3["Salary"] = df3.Salary.fillna(df3.Salary.median())
+    df3["Deptt"] = df3.Deptt.fillna(df3.Deptt.mode()[0])
+    print("after filling with median and mode:\n", df3)
+
+────────────────────────────────────────
+🔵 6 · groupby — one answer per group
+────────────────────────────────────────
+Question: what is the total Quantity for each MaterialID? The recipe is SPLIT the table into groups, APPLY a calculation, COMBINE the answers.
+
+    grp1 = df.groupby('MaterialID')     # creates groups based on MaterialID
+    grp1.groups                         # a dictionary: key = a MaterialID, value = list of row indices
+
+Then ask for a summary of one column:
+
+    grp1.Quantity.sum().reset_index()      # total Quantity of every MaterialID
+    grp1.Quantity.count().reset_index()    # number of rows (consignments) per MaterialID
+    grp1.Quantity.mean().reset_index()     # average Quantity per MaterialID
+
+reset_index() turns the group labels from the index into an ordinary column. A student asked "what if I don't write reset_index()?" Nothing breaks: you still get the answer, but the MaterialID is the row label instead of a column; add reset_index() when you want a normal table to merge, plot or save.
+
+Several summaries at once with agg:
+
+    df1 = grp1.Quantity.agg(['size', 'sum', 'mean']).reset_index()
+    # 4 columns: MaterialID, size (count), sum, mean
+
+@run groupby on one key
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(21)
+    n = 40
+    df = pd.DataFrame({
+        "MaterialID": rng.choice(["M101", "M102", "M103", "M104"], n),
+        "Location": rng.choice(["MWH-1", "MWH-2", "MWH-3"], n),
+        "Quantity": rng.integers(50, 500, n),
+    })
+
+    grp1 = df.groupby("MaterialID")
+    print("groups -> first 3 indices of each:")
+    for k, v in grp1.groups.items():
+        print("  ", k, list(v)[:3])
+    print()
+    print(grp1.Quantity.sum().reset_index(), "\n")
+    print(grp1.Quantity.agg(["size", "sum", "mean"]).reset_index())
+
+────────────────────────────────────────
+🔵 7 · groupby with two keys
+────────────────────────────────────────
+    grp2 = df.groupby(['MaterialID', 'Location'])
+    grp2.groups
+    grp2.Quantity.count().reset_index()
+    df2 = grp2.Quantity.agg(['size', 'sum', 'mean']).reset_index()
+
+    grp3 = df.groupby('Location')
+    grp4 = df.groupby(['Location', 'MaterialID'])
+
+The order of the keys matters for how the result is arranged. The first key is the PRIMARY key; it changes only after every possible value of the secondary key has been used. Result of groupby(['MaterialID','Location']): all locations for M101, then all locations for M102, and so on. Swap the keys and you get all materials of MWH-1, then all of MWH-2.
+
+Himanshu's question: "Can we use np.where with groupby, like GROUP BY … HAVING in SQL?" The idea is exactly right. First summarise, then filter the SUMMARY table:
+
+    summary = grp2.Quantity.agg(['size', 'sum']).reset_index()
+    summary[summary['sum'] > 1000]         # HAVING sum > 1000
+    # or  summary.iloc[np.where(summary['sum'] > 1000)[0]]
+
+@run two-key groupby and a HAVING-style filter
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(21)
+    n = 40
+    df = pd.DataFrame({
+        "MaterialID": rng.choice(["M101", "M102", "M103", "M104"], n),
+        "Location": rng.choice(["MWH-1", "MWH-2", "MWH-3"], n),
+        "Quantity": rng.integers(50, 500, n),
+    })
+
+    grp2 = df.groupby(["MaterialID", "Location"])
+    summary = grp2.Quantity.agg(["size", "sum", "mean"]).reset_index()
+    print(summary.head(8), "\n")
+    print("HAVING sum > 1000:")
+    print(summary[summary["sum"] > 1000])
+
+────────────────────────────────────────
+🔵 8 · Wide table → tall table: melt
+────────────────────────────────────────
+A WIDE table has one column per year (or month, or product). A TALL table has one column that says which year and one that holds the value. Most analysis and plotting wants the tall form.
+
+The Health sheet is wide: Country, Disease, then a column for each year.
+
+    df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Health')
+    df1 = pd.melt(df, id_vars=['Country', 'Disease'], var_name='Year', value_name='Cases')
+
+• id_vars: the columns that stay as they are (the identifiers)
+• var_name: the NEW column that will hold the old column names (the years)
+• value_name: the NEW column that will hold the numbers that were under those columns
+
+@run melt
+    import pandas as pd
+
+    df = pd.DataFrame({"Country": ["India", "India", "Kenya", "Kenya"],
+                       "Disease": ["Malaria", "Dengue", "Malaria", "Dengue"],
+                       "2019": [100, 40, 300, 10],
+                       "2020": [90, 55, 280, 12],
+                       "2021": [70, 60, 250, 15]})
+    print("WIDE:\n", df, "\n")
+    df1 = pd.melt(df, id_vars=["Country", "Disease"], var_name="Year", value_name="Cases")
+    print("TALL:", df1.shape, "\n")
+    print(df1)
+
+────────────────────────────────────────
+🔵 9 · Tall table → wide table: pivot_table
+────────────────────────────────────────
+The reverse journey. A student asked "so converting tall to broad is pivot_table, right?" Yes.
+
+    df2 = df1.pivot_table(index=['Country', 'Year'], columns='Disease', values='Cases')
+    df2 = df2.reset_index().rename_axis(columns=None)
+
+• index: what stays down the left side
+• columns: the column whose DIFFERENT VALUES become NEW COLUMNS (one per unique value)
+• values: the numbers that fill the cells
+• reset_index() and rename_axis(columns=None) clean up the labels so you get a plain table back
+
+On the board: df → df1 converted a broad DataFrame to a tall one; df1 → df2 converted a tall DataFrame to a broad one, with one column for each unique Disease.
+
+@run melt then pivot_table (round trip)
+    import pandas as pd
+
+    df = pd.DataFrame({"Country": ["India", "India", "Kenya", "Kenya"],
+                       "Disease": ["Malaria", "Dengue", "Malaria", "Dengue"],
+                       "2019": [100, 40, 300, 10],
+                       "2020": [90, 55, 280, 12],
+                       "2021": [70, 60, 250, 15]})
+    df1 = pd.melt(df, id_vars=["Country", "Disease"], var_name="Year", value_name="Cases")
+    df2 = (df1.pivot_table(index=["Country", "Year"], columns="Disease", values="Cases")
+              .reset_index().rename_axis(columns=None))
+    print(df2)
+
+────────────────────────────────────────
+🔵 10 · pivot_table as a summary tool, and crosstab
+────────────────────────────────────────
+pivot_table also summarises. Total quantity for every Location × MaterialID:
+
+    df1 = df.pivot_table(index='Location', columns='MaterialID', values='Quantity').reset_index()
+    # default aggfunc is the MEAN (not the sum!)
+
+    df1 = df.pivot_table(index='Location', columns='MaterialID', values='Quantity',
+                         aggfunc='sum').reset_index().rename_axis(columns=None)
+
+Options of aggfunc:
+• sum → total
+• count → frequency
+• mean → average
+• std → standard deviation
+• var → variance
+
+Cells with no matching rows are NaN. Aniket asked whether NaN can be replaced with 0 — yes, fill_value=0. margins=True adds the totals row and column (labelled All):
+
+    df1 = df.pivot_table(index='Location', columns='MaterialID', values='Quantity',
+                         aggfunc='sum', fill_value=0, margins=True)
+
+crosstab is the shortcut when you only want counts (or one sum) of two categorical columns:
+
+    pd.crosstab(df.MaterialID, df.Location, values=df.Quantity, aggfunc='sum')
+    pd.crosstab(df.MaterialID, df.Location)          # with no values: number of rows
+
+@run pivot_table options and crosstab
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(21)
+    n = 40
+    df = pd.DataFrame({
+        "MaterialID": rng.choice(["M101", "M102", "M103", "M104"], n),
+        "Location": rng.choice(["MWH-1", "MWH-2", "MWH-3"], n),
+        "Quantity": rng.integers(50, 500, n),
+    })
+
+    print("default aggfunc (mean):\n", df.pivot_table(index="Location", columns="MaterialID", values="Quantity").round(0), "\n")
+    p = df.pivot_table(index="Location", columns="MaterialID", values="Quantity",
+                       aggfunc="sum", fill_value=0, margins=True)
+    print("sum with totals:\n", p, "\n")
+    print("crosstab counts:\n", pd.crosstab(df.MaterialID, df.Location))
+
+────────────────────────────────────────
+🔵 11 · Sorting with sort_values
+────────────────────────────────────────
+    df_sorted = df.sort_values('Quantity').reset_index(drop=True)                    # increasing
+    df_sorted = df.sort_values('Quantity', ascending=False).reset_index(drop=True)   # decreasing
+
+Sorting on several columns, each with its own direction:
+
+    df_sorted = df.sort_values(['MaterialID', 'Location', 'Quantity'],
+                               ascending=[True, False, False])
+    # first level : MaterialID ascending
+    # second level: Location descending
+    # third level : Quantity descending
+
+Sagar asked "can we sort count-wise?" Yes: sort the counts table, not the labels: counts.sort_values('Counts', ascending=False). This is used for bar charts in the visualisation note.
+
+@run multi-level sort
+    import pandas as pd
+    df = pd.DataFrame({"MaterialID": ["M2", "M1", "M2", "M1", "M2"],
+                       "Location": ["A", "B", "B", "A", "B"],
+                       "Quantity": [30, 10, 50, 20, 40]})
+    print(df.sort_values(["MaterialID", "Location", "Quantity"], ascending=[True, False, False]))
+
+────────────────────────────────────────
+🟠 12 · Common mistakes
+────────────────────────────────────────
+• Using concat when you meant merge (or the other way round). concat stacks rows, merge matches rows.
+• Merging on a key with duplicate values on both sides: every pair is matched, so the result can have MORE rows than either table.
+• Expecting inner to keep unmatched rows. Only outer/left/right keep them.
+• Forgetting that pivot_table's default is the MEAN. Always state aggfunc.
+• Filling every missing number with the mean when there are outliers. The median is safer.
+• Using df.drop(ind[0]) after the labels have been shuffled by a sort — the numbers in ind refer to LABELS, so reset_index(drop=True) first.
+
+────────────────────────────────────────
+🔵 13 · Practice questions
+────────────────────────────────────────
+Table P (Pune): Subject = Maths, Stats, Python; Table M (Mumbai): Subject = Stats, SQL, Python.
+Q1. How many rows has the merge on Subject with how='inner'? With 'outer'? With 'left' (P first)? With 'right'?
+Q2. In an outer merge, which columns hold NaN for SQL?
+Q3. Salary column [50, 70, NaN, 80, NaN]. What does fillna(median) put in the blanks? What would the mean have put?
+Q4. Which function turns a table with columns 2019, 2020, 2021 into one Year column and one Cases column? Which one reverses it?
+Q5. Write the call for: total Quantity for each Location and MaterialID, as an ordinary table.
+Q6. You run df.pivot_table(index='Location', columns='MaterialID', values='Quantity') and get averages. How do you get totals, with 0 instead of NaN?
+
+Answers
+A1. inner 2 (Stats, Python); outer 4 (Maths, Stats, Python, SQL); left 3 (Maths, Stats, Python); right 3 (Stats, SQL, Python).
+A2. The columns that come from table P (they are missing for SQL).
+A3. Median of 50, 70, 80 = 70. Mean = 66.7, shown as 66.67.
+A4. melt; pivot_table.
+A5. df.groupby(['Location','MaterialID']).Quantity.sum().reset_index()
+A6. add aggfunc='sum', fill_value=0.
+
+────────────────────────────────────────
+🟢 14 · One-page cheat sheet
+────────────────────────────────────────
+    pd.concat([d1, d2]).reset_index(drop=True)      stack rows
+    pd.merge(d1, d2, on=[keys], how='inner')        join (inner/outer/left/right)
+    d.isnull()   np.where(d.col.isnull())           find missing values
+    d.col.fillna(value)                             fill (median / mode / fixed)
+    d.groupby(keys).col.agg(['size','sum','mean'])  one answer per group
+    .reset_index()                                  group labels back to a column
+    pd.melt(d, id_vars, var_name, value_name)       wide -> tall
+    d.pivot_table(index, columns, values, aggfunc)  tall -> wide / summary table
+    pd.crosstab(a, b)                               counts of two categories
+    d.sort_values([cols], ascending=[..])           sort

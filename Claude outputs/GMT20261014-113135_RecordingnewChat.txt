@@ -1,0 +1,36 @@
+00:07:02	Shivraj Singh:	5
+00:07:04	Himanshu Nigam:	5/10
+00:07:05	Debmalya Paul:	Numpy: 3/5
+Pandas: 3/5
+00:07:08	Shubham Wadhave:	6/10
+00:07:12	Gurunath Vadnere:	5
+00:07:15	RUSHIKESH GHUGE:	5/10
+00:09:04	Sudeep Bhargava:	import numpy as npimport pandas as pd
+00:09:38	Sudeep Bhargava:	import numpy as npimport pandas as pdimport matplotlibfrom matplotlib import pyplot as plt
+00:10:25	Sudeep Bhargava:	list, tuple, dictionary, set
+00:10:55	Sudeep Bhargava:	numpy - ndarray
+00:11:02	Sudeep Bhargava:	nd - n-dimensional
+00:12:12	Sudeep Bhargava:	pandas - Series, DataFrame
+00:14:07	Sudeep Bhargava:	a1 = np.array([3,6,5,7,8,9,1,2])
+00:18:25	Sudeep Bhargava:	a1 = np.array([3,6,5,7,8,9,1,2])   # creating an arraytype(a1)   # to know the type of data structurelen(a1)    # number of elementsa1[3]    # extract the fourth element# elements at the index 2,5,6 to be extracted
+00:20:00	Sudeep Bhargava:	a1[[2,5,6]]   # extracts the elements at index 2,5 and 6
+00:24:23	Sudeep Bhargava:	a1[2:5]    # extract values from index 2,3,4(=5-1)a1[2:]   # extract all values from index 2 upto the enda1[:4]   # extract all value from start upto index 3 (=4-1)
+00:25:54	Suraj Shankhwar:	no sir
+00:26:11	Sagar Jadhav:	No Sir
+00:35:13	Sudeep Bhargava:	a2 = np.array([[2,4,5,6],[1,6,5,7]])   # create a 2 dimensional arraya3 = np.array([4,3,5,6,8,7,9,2])a4 = a3.reshape(4,2)   # changes the shape of a2 to 4 rows and 2 columnsa5 = a3.reshape(-1,1)  # changes the shape of a3 to n number of rows and 1 column# n is decided by python and is equal to the number of elements in a3
+00:36:29	Sudeep Bhargava:	a6 = a3.reshape(2,4)   # changes the shape of a2 to 2 rows and 4 columns
+00:37:28	Aniket Jadhav:	no sir
+00:37:32	Suraj Shankhwar:	no sir
+00:44:44	Sudeep Bhargava:	a1 = np.array([3,6,5,7,8,9,1,2]) a1<=4   # gives a logical array with the values as True and False# when condition is met the result is True# when condition is not met the result is Falseind = np.where(a1<=4)   # gives the indices where the condition in the barckets are met# array ind has all the indices where the condition is met
+00:48:17	Suraj Shankhwar:	ye sir
+00:48:19	Trupti Badhekar:	yes sir
+00:48:20	Himanshu Nigam:	yes sir
+00:56:47	Sudeep Bhargava:	# np.where'''Quest1: what are the indices of the values which are <= 4Quest2: how many values are <= 4Quest3: what are the values which are <= 4'''a1 = np.array([3,6,5,7,8,9,1,2]) a1<=4   # gives a logical array with the values as True and False# when condition is met the result is True# when condition is not met the result is Falseind = np.where(a1<=4)   # gives the indices where the condition in the barckets are met# array ind has all the indices where the condition is metlen(ind[0])    # gives the number of values which are meeting the criteria(a1<=4).sum()  # gives the number of values which are meeting the criteriaa1[ind[0]]    # extracts the values at the indices in ind[0]a1[a1<=4]     # extracts the values at the indices in ind[0]
+01:00:25	Suraj Shankhwar:	no sir
+01:00:31	Dhiraj Ingale:	no sir
+01:05:29	Suraj Shankhwar:	yes sir
+01:05:34	Shivraj Singh:	all good sir
+01:06:15	Suraj Shankhwar:	Thankyou sir
+01:06:15	Himanshu Nigam:	thank you sir
+01:06:24	Sagar Jadhav:	thank you Sir
+01:06:33	Shubham Wadhave:	thank you sir

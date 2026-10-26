@@ -1,0 +1,27 @@
+00:13:33	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name = 'faithful')x = df.waitingy = df.eruptions
+00:14:38	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name = 'faithful')x = df.waitingy = df.eruptionsfrom scipy.stats import pearsonrpearsonr(x,y)   # value of the correlation coefficient
+00:27:04	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name = 'salaries')
+00:31:40	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name = 'salaries')mydf = df[['yrs_service','gender','salary']]
+00:38:10	Sudeep Bhargava:	x1 = mydf.salary.iloc[np.where(mydf.gender=='Male')]  # selecting the rows of salary column under the # condition that the gender should be malex2 = mydf.salary.iloc[np.where(df.gender=='Female')]# selecting the rows of salary column under the # condition that the gender should be female
+00:38:42	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name = 'salaries')mydf = df[['yrs_service','gender','salary']]# salary - response (continuous)# yrs_service - predictor1 (continuous)# gender - predictor2 (categorical)plt.scatter(mydf.yrs_service,mydf.salary)check the effecct of a categorical data on the continuous response, we make a box plotx1 = mydf.salary.iloc[np.where(mydf.gender=='Male')]  # selecting the rows of salary column under the # condition that the gender should be malex2 = mydf.salary.iloc[np.where(df.gender=='Female')]# selecting the rows of salary column under the # condition that the gender should be female
+00:39:19	Aniket Jadhav:	can someone share dataset here
+00:39:50	Aniket Jadhav:	Thank you
+00:40:27	Sanjyot Sawant:	yes running
+00:45:26	Sudeep Bhargava:	import statsmodelsfrom statsmodels import statsfrom statsmodels.stats import weightstats
+00:45:38	Sudeep Bhargava:	import statsmodelsfrom statsmodels import statsfrom statsmodels.stats import weightstats as ssw
+00:46:12	Sudeep Bhargava:	ssw.ztest(x1,x2)
+00:47:32	Sanjyot Sawant:	got it
+00:52:29	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name = 'salaries')mydf = df[['yrs_service','gender','salary']]# salary - response (continuous)# yrs_service - predictor1 (continuous)# gender - predictor2 (categorical)plt.scatter(mydf.yrs_service,mydf.salary)pearsonr(mydf.yrs_service,mydf.salary)# Ho: salary is not dependent on yrs_service# p-value (0) < 0.05 so we REJECT Ho# Conclusion : salary depends on yrs_servicecheck the effect of a categorical data on the continuous response, we make a box plotx1 = mydf.salary.iloc[np.where(mydf.gender=='Male')]  # selecting the rows of salary column under the # condition that the gender should be malex2 = mydf.salary.iloc[np.where(df.gender=='Female')]# selecting the rows of salary column under the # condition that the gender should be female
+00:52:38	Sudeep Bhargava:	plt.boxplot([x1,x2])# 2 sample t testimport statsmodelsfrom statsmodels import statsfrom statsmodels.stats import weightstats as ssw# Ho: avg salary of males = avg salary of femalesssw.ztest(x1,x2)# p-value = 0.0054 < 0.05# We reject the Ho# avg salary of males is not equal to avg salary of females
+00:53:07	Ayush Saxena:	clear
+01:07:08	Sudeep Bhargava:	g_dummy = pd.get_dummies(mydf.gender,drop_first=True).astype(int)mydf = mydf.drop('gender', axis=1)mydf = pd.concat([mydf,g_dummy], axis=1)x = df.drop('salary', axis=1)y = df.salary
+01:08:19	sakshi gaddamwar:	it's working
+01:08:21	Aniket Jadhav:	working sir
+01:09:39	Sudeep Bhargava:	x = mydf.drop('salary', axis=1)y = mydf.salaryfrom sklearn.linear_model import LinearRegressionreg1=LinearRegression()reg1.fit(x,y)
+01:11:42	Aniket Jadhav:	working
+01:11:43	sakshi gaddamwar:	yes sir
+01:12:19	Sudeep Bhargava:	reg1.coef_reg1.intercept_
+01:14:48	Sudeep Bhargava:	# When the yrs_service increases by 1 unit, the salary increases by 747.61# For the same years of service, if we select a male candidate over a female, we would# have to pay him 9071.8 more than the females
+01:16:57	Sudeep Bhargava:	92356 is the salary which would be paid to a female when they yrs_service = 0
+01:17:52	Sudeep Bhargava:	intercept term gives us the response when all the continuous predictors = 0 and categorical predictors are set at the reference level
+01:19:26	Debmalya Paul:	Yes ma'am

@@ -1,0 +1,35 @@
+00:10:47	Sudeep Bhargava:	df1 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Pune')df2 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Mumbai')
+00:12:47	Sudeep Bhargava:	pd.merge(df1,df2, on='Subject')
+00:13:28	Debmalya Paul:	Sir, could you please share the xlsx file once?
+00:15:50	Debmalya Paul:	Reacted to "CDAC_DataBook.xlsx" with 👍
+00:16:23	Sudeep Bhargava:	pd.merge(df1,df2, on=['Subject','Grade'])
+00:20:13	Sudeep Bhargava:	import numpy as npimport pandas as pdimport matplotlibfrom matplotlib import pyplot as pltdf1 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Pune')df2 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Mumbai')pd.merge(df1,df2, on='Subject')pd.merge(df1,df2, on=['Subject','Grade'])
+00:21:01	Sudeep Bhargava:	# looks for common combinations of Subject AND grade in df1 and df2# BOTH Subject AND Grade should be common
+00:24:58	Sudeep Bhargava:	pd.merge(df1,df2, on=['Subject','Grade','Name'])# looks for common combinations of Subject AND grade AND NAME in df1 and df2# All Subject AND Grade AND Name should be common # Since there is no such row so we get a empty data frame# Be default, "on" option has all the common column names.
+00:25:11	Dhiraj Ingale:	Its similar to the SQL joins right?
+00:37:55	Sudeep Bhargava:	pd.merge(df1,df2, on='Subject', how='inner')# inner looks for the common subjects between df1 and df2# the default value value for "how" is inner# keyword for inner is ANDpd.merge(df1,df2, on='Subject', how='outer')# outer looks for the subjects either in df1 OR df2# keyword for inner is OR
+00:44:03	Sudeep Bhargava:	pd.merge(df1,df2, on='Subject', how='left')# left looks for the subjects in df1 (df1 was mentioned before df2)# the subjects taught in df2 but not in df1 will not appear
+00:45:45	Sudeep Bhargava:	pd.merge(df1,df2, on='Subject', how='left')# left looks for the subjects in df1 (df1 was mentioned before df2)# the subjects taught in df2 but not in df1 will not appearpd.merge(df1,df2, on='Subject', how='right')# right looks for the subjects in df2 (df2 was mentioned after df1)# the subjects taught in df1 but not in df2 will not appear
+00:47:20	Sudeep Bhargava:	df1 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Salary')df2 = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='Deptt')
+00:52:08	Sudeep Bhargava:	pd.merge(df1,df2)# looks for the common Name AND EmpID on both df1 and df2# looks for only Name and EmpID because they are two columns common to df1 and df2# the output also has the unique columns to both df1 and df2
+00:53:04	Sudeep Bhargava:	# the "how" option has the defailt value of inner
+00:56:33	Sudeep Bhargava:	pd.merge(df1,df2,how='outer')# outer looks for the Name and EmpID either in df1 OR df2# keyword for outer is OR# If the Name and EmpID is in df1 but not in df2 then Deptt column will have NaN# If the Name and EmpID is in df2 but not in df1 then Salary column will have NaN
+01:01:43	Sudeep Bhargava:	df3 = pd.merge(df1,df2,how='outer')ind = np.where(df3.Salary.isnull())
+01:02:14	Sudeep Bhargava:	# indices of the rows which have a missing value in Salary column of df3
+01:05:38	Sudeep Bhargava:	df3 = pd.merge(df1,df2,how='outer')ind = np.where(df3.Salary.isnull())# indices of the rows which have a missing value in Salary column of df3# df3 has to be split in two parts# df3A - NO missing value in Salary column# df3B - all missing values in Salary columndf3B = df3.iloc[ind[0]]df3A = df3.drop(ind[0])
+01:10:41	Sudeep Bhargava:	df3.Salary = df3.Salary.fillna(df3.Salary.median())# replaces all the missing values in Salary column with the median# we prefer median over the mean because median is not affected by the outliers
+01:12:33	Sudeep Bhargava:	df3.Salary = df3.Salary.fillna(60)# replaces all the missing values in Salary column with 60
+01:15:57	Sudeep Bhargava:	df3.Deptt = df3.Deptt.fillna(df3.Deptt.mode()[0])# # replaces all the missing values in Deptt column with the mode
+01:17:31	Sudeep Bhargava:	df3.Deptt = df3.Deptt.fillna('Overheads')# replaces all the missing values in Deptt column with 'Overheads'
+01:23:53	Sudeep Bhargava:	grp1 = df.groupby('MaterialID')# creates groups based on the MaterialIDgrp1.groups
+01:26:48	Sudeep Bhargava:	grp1 = df.groupby('MaterialID')# creates groups based on the MaterialIDgrp1.groups# output is a dictionary where the keys are the unique values of MaterialID and the value is the list# of indices where that specific MaterialID appears
+01:32:51	Sudeep Bhargava:	grp1.Quantity.sum().reset_index()# gives the total Quantity of all unique MaterialIDsgrp1.Quantity.count().reset_index()# gives the count of all unique MaterialIDsgrp1.Quantity.mean().reset_index()# gives the average Quantity of all unique MaterialIDs
+01:35:00	Suraj Shankhwar:	sir if we dont apply .reset_index() in the cmd, will it be fine?
+01:39:48	Suraj Shankhwar:	yes sir
+01:40:54	Sudeep Bhargava:	df1 = grp1.Quantity.agg(['size','sum','mean']).reset_index()# creates a df with the name df1 with 4 columns. The first column# will have the unique MaterialIDs# the other 3 columns will have count, sum and mean for Quantity
+01:55:51	Sudeep Bhargava:	grp2 = df.groupby(['MaterialID','Location'])# grouping is done on two columns - MaterialID, Location# MaterialID is the primary key which changes only when all possible values of# the secondary key (Location) are exhaustedgrp2.groupsgrp2.Quantity.count().reset_index()df2 = grp2.Quantity.agg(['size','sum','mean']).reset_index()
+01:57:29	Sudeep Bhargava:	grp3 = df.groupby('Location')grp4 = df.groupby(['Location','MaterialID')
+01:58:18	Himanshu Nigam:	sir, can we also use np.where with groupby ( like we use group by with having in sql) ?
+02:07:29	Suraj Shankhwar:	bye sur
+02:07:40	Rahul Chaudhari:	thank you sir
+02:07:49	Sagar Jadhav:	Thank you Sir

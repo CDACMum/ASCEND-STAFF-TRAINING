@@ -1,0 +1,362 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ASCEND Staff Attendance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+/* Layout: verdict band → status cards → trend (target line) → engagement groups → locations → follow-up worklist → lookup */
+:root{
+ --bg:#f3f5f8;--card:#fff;--fg:#17212e;--muted:#5b6778;--rule:#dfe4eb;--soft:#eef1f5;
+ --brand:#173556;--brand-fg:#fff;--accent:#2a66a8;--accent-bg:#e5edf7;
+ --ok:#15774a;--ok-bg:#e1f2e8;--warn:#a65a06;--warn-bg:#fbeedb;--bad:#b3261e;--bad-bg:#fbe6e4;--early:#c98a1e;--absent:#cdd4de;
+ --display:"Source Serif 4",Georgia,"Times New Roman",serif;--body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+ --bg:#0e141c;--card:#161e29;--fg:#e6ecf3;--muted:#9aa7b8;--rule:#283445;--soft:#1d2734;
+ --brand:#15283f;--brand-fg:#e6ecf3;--accent:#76a9e3;--accent-bg:#1c2b3e;
+ --ok:#4cc98b;--ok-bg:#15301f;--warn:#f0ad4e;--warn-bg:#35270f;--bad:#f2786f;--bad-bg:#3a1c1a;--early:#e0a53d;--absent:#344255;color-scheme:dark}}
+:root[data-theme="dark"]{
+ --bg:#0e141c;--card:#161e29;--fg:#e6ecf3;--muted:#9aa7b8;--rule:#283445;--soft:#1d2734;
+ --brand:#15283f;--brand-fg:#e6ecf3;--accent:#76a9e3;--accent-bg:#1c2b3e;
+ --ok:#4cc98b;--ok-bg:#15301f;--warn:#f0ad4e;--warn-bg:#35270f;--bad:#f2786f;--bad-bg:#3a1c1a;--early:#e0a53d;--absent:#344255;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);font-variant-numeric:tabular-nums}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:18px}
+h1,h2,h3{text-wrap:balance}
+.hero{background:var(--brand);color:var(--brand-fg);padding-block:22px 64px}
+.tag{font-size:12px;letter-spacing:.09em;text-transform:uppercase;opacity:.75}
+.verdict{font:600 27px/1.3 var(--display);margin:12px 0 0;max-width:820px}
+.verdict mark{background:none;color:inherit;border-bottom:3px solid #ff8f85}
+.verdict mark.g{border-color:#6fd6a0}
+.asof{font-size:13.5px;opacity:.8;margin-top:10px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:-42px}
+.kpi{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:14px 16px;box-shadow:0 4px 14px rgba(15,25,40,.07)}
+.kpi .l{font-size:13px;color:var(--muted);font-weight:600}
+.kpi .v{font-size:32px;font-weight:700;line-height:1.15;margin:4px 0 6px}
+.kpi .v small{font-size:14px;font-weight:600;color:var(--muted)}
+.kpi .n{font-size:13px;color:var(--muted)}
+.badge{display:inline-block;font-size:12px;font-weight:700;border-radius:20px;padding:1px 9px;vertical-align:5px}
+.b-ok{background:var(--ok-bg);color:var(--ok)}.b-warn{background:var(--warn-bg);color:var(--warn)}.b-bad{background:var(--bad-bg);color:var(--bad)}.b-info{background:var(--accent-bg);color:var(--accent)}
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--bg);border-bottom:1px solid var(--rule);margin-top:18px}
+nav .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:8px;scrollbar-width:none}
+nav a{flex:none;text-decoration:none;color:var(--muted);font-weight:600;font-size:14.5px;padding:6px 12px;border-radius:20px}
+nav a:hover,nav a.on{background:var(--brand);color:var(--brand-fg)}
+nav a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section{scroll-margin-top:64px;padding-block:28px 4px}
+.q{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+h2{font:700 23px/1.3 var(--display);margin:4px 0 6px}
+.sub{color:var(--muted);font-size:14.5px;margin:0 0 14px;max-width:70ch}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:16px 18px;min-width:0}
+.card h3{font-size:16px;margin:0 0 2px}
+.cs{font-size:13.5px;color:var(--muted);margin:0 0 6px}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mut{color:var(--muted)}
+/* bar chart with target line */
+.chart{position:relative;height:190px;margin-top:22px;border-bottom:1px solid var(--rule)}
+.bars{position:absolute;inset:0;display:flex;align-items:flex-end;gap:10px}
+.bar{flex:1;position:relative;height:100%;display:flex;align-items:flex-end}
+.bar i{display:block;width:100%;border-radius:5px 5px 0 0;background:var(--accent)}
+.bar.below i{background:var(--warn)}
+.bar b{position:absolute;left:0;right:0;text-align:center;font-size:13px}
+.target{position:absolute;left:0;right:0;border-top:2px dashed var(--fg);opacity:.55;pointer-events:none}
+.target span{position:absolute;right:0;top:-20px;font-size:11.5px;font-weight:700;background:var(--card);padding:0 4px}
+.xl{display:flex;gap:10px;font-size:12px;color:var(--muted);text-align:center;margin-top:6px}
+.xl span{flex:1;line-height:1.3;min-width:0}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:10px;align-items:center}
+.sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+details summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--accent);list-style:none;margin-top:10px}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:"+ "}details[open] summary::before{content:"− "}
+.hb{display:grid;grid-template-columns:70px minmax(0,1fr) 38px;gap:8px;align-items:center;margin:6px 0;font-size:13px}
+.hb .t{height:9px;background:var(--soft);border-radius:5px;overflow:hidden}
+.hb .t i{display:block;height:100%;background:var(--accent)}
+.hb b{text-align:right}
+/* groups */
+.grp{border:1px solid var(--rule);background:var(--card);border-radius:12px;padding:16px;border-top-width:5px}
+.grp.k1{border-top-color:var(--ok)}.grp.k2{border-top-color:var(--accent)}.grp.k3{border-top-color:var(--warn)}.grp.k4{border-top-color:var(--bad)}
+.grp .num{font-size:34px;font-weight:700;line-height:1}
+.grp .ti{font-weight:700;margin-top:4px}
+.grp p{font-size:13.5px;color:var(--muted);margin:4px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.chip{background:var(--soft);border-radius:14px;padding:2px 9px;font-size:13px}
+/* table */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--rule);padding:8px 8px;white-space:nowrap}
+td{padding:9px 8px;border-bottom:1px solid var(--rule)}
+tr:last-child td{border-bottom:0}
+.r{text-align:right}
+/* follow-up */
+.progress{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:14px;margin-bottom:14px}
+.pbar{flex:1;min-width:160px;height:10px;background:var(--soft);border-radius:6px;overflow:hidden;display:flex}
+.pbar i{display:block;height:100%}
+.cat{margin-top:18px}
+.cat h3{font-size:16px;margin:0}
+.cat .act{font-size:13.5px;color:var(--muted);margin:2px 0 10px}
+.pcs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.pc{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.pc.done{opacity:.6}
+.who{display:flex;gap:10px;align-items:flex-start}
+.who .nm{font-weight:700;line-height:1.25}
+.who .m{font-size:12.5px;color:var(--muted)}
+.who .pv{margin-left:auto;text-align:right;font-weight:700;font-size:19px;line-height:1.1;white-space:nowrap}
+.who .pv small{display:block;font-size:11.5px;font-weight:600;color:var(--muted)}
+.facts{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px}
+.facts b{color:var(--fg);font-weight:600}
+.strip{display:flex;gap:2px}
+.strip i{flex:1;height:11px;border-radius:2px;background:var(--absent)}
+.strip i.P{background:var(--ok)}.strip i.S{background:var(--early);height:7px;align-self:center}
+.mk{display:inline-block;min-width:24px;height:22px;line-height:22px;text-align:center;border-radius:5px;font-size:12px;font-weight:700;margin-right:2px}
+.mk.P{background:var(--ok-bg);color:var(--ok)}.mk.A{background:var(--bad-bg);color:var(--bad)}.mk.L{background:var(--warn-bg);color:var(--warn)}
+.status{display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--rule);padding-top:9px}
+.status select,.status input{font:inherit;font-size:13.5px;padding:6px 8px;border:1px solid var(--rule);border-radius:8px;background:var(--card);color:var(--fg)}
+.status input{flex:1;min-width:120px}
+.saved{font-size:12px;color:var(--muted)}
+.btn{font:inherit;font-size:14px;font-weight:600;border:1px solid var(--rule);background:var(--card);color:var(--accent);border-radius:10px;padding:8px 14px;cursor:pointer;margin-top:14px}
+/* lookup */
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.controls input,.controls select{font:inherit;font-size:14.5px;padding:9px 11px;border:1px solid var(--rule);border-radius:10px;background:var(--card);color:var(--fg)}
+.controls input{flex:1;min-width:180px}
+.reg .s{width:180px}
+.hint{font-size:13.5px;color:var(--muted);padding:8px 0}
+footer{color:var(--muted);font-size:13px;padding-block:28px 40px;line-height:1.7}
+@media (max-width:900px){.pcs{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis,.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){
+ .wrap{padding-inline:16px}.verdict{font-size:22px}.kpi .v{font-size:26px}
+ .g2,.pcs{grid-template-columns:1fr}
+ .bars,.xl{gap:5px}.xl{font-size:11px}.bar b{font-size:11.5px}
+ .reg thead{display:none}
+ .reg tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;padding:10px 0;border-bottom:1px solid var(--rule)}
+ .reg td{border:0;padding:0}.reg .c0{display:none}.reg .c1{font-weight:700}.reg .c3{grid-column:2;grid-row:1/3}
+ .reg .c2{color:var(--muted);font-size:13px}.reg .s,.reg .c5,.reg .c4{grid-column:1/3;width:auto}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+
+<header class="hero"><div class="wrap">
+ <div class="tag">C-DAC Mumbai · ASCEND 2026 · Applied AI/ML Engineering · Staff attendance</div>
+ <p class="verdict" id="verdict"></p>
+ <div class="asof" id="asof"></div>
+</div></header>
+
+<div class="wrap"><div class="kpis" id="kpis"></div></div>
+
+<nav aria-label="Sections"><div class="wrap">
+ <a href="#trend">Trend</a><a href="#groups">Engagement</a><a href="#locations">Locations</a><a href="#followup">Follow-up</a><a href="#lookup">Find a person</a>
+</div></nav>
+
+<main class="wrap">
+
+<section id="trend">
+ <div class="q">Is it getting better or worse?</div>
+ <h2 id="trendH"></h2>
+ <p class="sub">The dashed line marks the 75% target. Blue bars meet it; amber bars fall short.</p>
+ <div class="g2">
+  <div class="card"><h3>Zoom sessions, by week</h3><p class="cs">Average share of staff present per session</p>
+   <div class="chart" id="wk"></div><div class="xl" id="wkx"></div>
+   <details><summary>Every session</summary><div id="sess"></div></details>
+  </div>
+  <div class="card"><h3>Classroom lectures</h3><p class="cs">Share of staff present at each lecture</p>
+   <div class="chart" id="lec"></div><div class="xl" id="lecx"></div>
+   <p class="cs" id="lecnote" style="margin-top:10px"></p>
+  </div>
+ </div>
+ <div class="card" style="margin-top:14px">
+  <h3 id="earlyH"></h3><p class="cs" id="earlyS"></p>
+  <div class="chips" id="early"></div>
+ </div>
+</section>
+
+<section id="groups">
+ <div class="q">Who is engaged?</div>
+ <h2 id="grpH"></h2>
+ <p class="sub">Each person is in exactly one group. Regular on Zoom means present at 75% or more of sessions. Regular in class means present at 2 or more of the 3 lectures.</p>
+ <div class="g4" id="grps"></div>
+</section>
+
+<section id="locations">
+ <div class="q">Where is the gap?</div>
+ <h2 id="locH"></h2>
+ <p class="sub">Green is at or above 75%, amber 50 to 74%, red below 50%.</p>
+ <div class="card tw"><table id="loct"></table></div>
+</section>
+
+<section id="followup">
+ <div class="q">What needs doing?</div>
+ <h2 id="fuH"></h2>
+ <p class="sub" id="fuS"></p>
+ <div class="progress" id="prog"></div>
+ <div id="cats"></div>
+ <div id="watchWrap"></div>
+</section>
+
+<section id="lookup">
+ <div class="q">Find a person</div>
+ <h2>Look up any staff member</h2>
+ <p class="sub">Search by name or employee number, or list everyone at one location.</p>
+ <div class="card">
+  <div class="controls">
+   <input type="search" id="q" placeholder="Name or employee no" aria-label="Search by name or employee number">
+   <select id="fl" aria-label="Location"><option value="">Location</option><option>Kharghar</option><option>Juhu</option></select>
+   <select id="so" aria-label="Sort"><option value="no">By S.No</option><option value="lo">Lowest Zoom first</option><option value="hi">Highest Zoom first</option></select>
+  </div>
+  <div class="tw"><table class="reg" id="reg"></table></div>
+  <div class="legend"><span><span class="sw" style="background:var(--ok)"></span>Present</span><span><span class="sw" style="background:var(--early)"></span>Joined, left early</span><span><span class="sw" style="background:var(--absent)"></span>Absent</span><span><span class="mk P">P</span><span class="mk A">A</span><span class="mk L">L</span>Classroom: present, absent, leave</span></div>
+ </div>
+</section>
+
+<footer id="foot"></footer>
+</main>
+
+<script>
+var DATA={"dates":["2026-09-01","2026-09-02","2026-09-03","2026-09-04","2026-09-08","2026-09-09","2026-09-10","2026-09-12","2026-09-16","2026-09-17","2026-09-21","2026-09-23","2026-09-24","2026-09-26","2026-09-28","2026-09-30","2026-10-03","2026-10-05","2026-10-06","2026-10-07","2026-10-08"],"people":[{"no":1,"name":"Mr Abhijeet Bapurao Wagh","emp":"346982","loc":"Kharghar","cls":["A","A","A"],"on":["P","P","P","P","S","P","P","A","A","A","P","P","P","A","S","P","P","P","P","P","S"]},{"no":2,"name":"Mr Abhishek Fulchand Gade","emp":"348265","loc":"Kharghar","cls":["P","P","P"],"on":["P","P","P","A","P","P","P","P","S","S","P","P","P","P","P","P","P","P","P","P","P"]},{"no":3,"name":"Mr Aditya Kansana","emp":"346280","loc":"Kharghar","cls":["P","A","A"],"on":["P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","S","P","S","S","P","P"]},{"no":4,"name":"Mr Ajinkya Maruti Dhumal","emp":"347699","loc":"Kharghar","cls":["P","P","P"],"on":["P","P","P","P","P","P","P","A","S","P","S","P","P","P","P","P","P","S","P","P","P"]},{"no":5,"name":"Mr Akshay Yogiraj Kirange","emp":"345543","loc":"Juhu","cls":["P","P","P"],"on":["P","P","P","S","P","P","P","S","S","P","P","P","A","P","P","P","P","P","S","P","P"]},{"no":6,"name":"Mr Aman Giri","emp":"345546","loc":"Juhu","cls":["P","P","A"],"on":["A","P","P","A","A","P","P","P","P","P","P","A","P","P","P","P","P","P","P","P","P"]},{"no":7,"name":"Mr Aniket Tanaji Jadhav","emp":"349176","loc":"Kharghar","cls":["P","P","P"],"on":["A","P","P","P","P","P","P","P","P","P","P","S","P","A","A","P","P","P","A","P","S"]},{"no":8,"name":"Mr Aniket Yadunath Takmare","emp":"345619","loc":"Kharghar","cls":["P","P","A"],"on":["P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","S","P","S","P"]},{"no":9,"name":"Mr Anil Kumar Chaurasiya","emp":"344190","loc":"Juhu","cls":["A","A","A"],"on":["P","P","P","P","P","P","S","A","A","A","A","A","A","A","A","A","A","A","A","A","A"]},{"no":10,"name":"Ms Arati Krunal Kamdi","emp":"344809","loc":"Kharghar","cls":["A","A","A"],"on":["P","P","P","P","P","P","S","P","A","P","S","P","P","P","P","A","P","P","P","P","P"]},{"no":11,"name":"Mr Ayush Saxena","emp":"350303","loc":"Juhu","cls":["A","P","A"],"on":["P","P","P","S","P","S","S","S","P","P","P","P","A","A","S","P","P","P","A","P","P"]},{"no":12,"name":"Mr Basant Chaudashi","emp":"346768","loc":"Juhu","cls":["P","A","A"],"on":["P","P","P","S","P","A","P","P","P","S","A","A","A","A","P","A","S","P","A","P","P"]},{"no":13,"name":"Ms Bhagyashree Anil Pawar","emp":"346214","loc":"Juhu","cls":["P","P","A"],"on":["P","P","P","A","P","P","A","P","P","P","P","P","S","P","P","P","P","P","P","P","P"]},{"no":14,"name":"Mr Debmalya Paul","emp":"346981","loc":"Kharghar","cls":["P","P","P"],"on":["P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","S","P","P","P","P","P"]},{"no":15,"name":"Mr Dhiraj Pralhad Ingale","emp":"345475","loc":"Juhu","cls":["P","P","P"],"on":["P","P","P","A","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P"]},{"no":16,"name":"Mr Gurunath Vilas Vadnere","emp":"345321","loc":"Kharghar","cls":["A","A","A"],"on":["P","P","P","A","P","P","P","P","A","A","P","A","P","A","P","P","A","A","S","P","P"]},{"no":17,"name":"Mr Himanshu Nigam","emp":"346772","loc":"Juhu","cls":["P","A","P"],"on":["P","P","P","P","P","P","P","P","P","P","P","P","P","A","P","P","A","P","A","P","P"]},{"no":18,"name":"Mr Himanshu Popat Katkar","emp":"348418","loc":"Kharghar","cls":["P","A","P"],"on":["P","P","P","A","P","P","P","P","P","P","P","P","P","P","P","P","P","P","S","P","P"]},{"no":19,"name":"Ms Janhavi Kunwar","emp":"347519","loc":"Juhu","cls":["P","P","A"],"on":["P","A","P","S","A","P","P","P","P","P","P","P","P","P","P","P","P","A","S","P","P"]},{"no":20,"name":"Ms Jidnyasa Sunil Bhoir","emp":"347833","loc":"Kharghar","cls":["P","A","P"],"on":["P","P","P","S","P","A","A","A","A","P","A","A","A","A","A","A","A","P","S","A","P"]},{"no":21,"name":"Mr Kamal Kant","emp":"344538","loc":"Juhu","cls":["P","P","P"],"on":["P","P","P","A","P","P","P","P","P","P","P","P","P","P","P","P","S","P","P","P","A"]},{"no":22,"name":"Mr Kamran Salim Shaikh","emp":"345513","loc":"Kharghar","cls":["P","A","L"],"on":["P","P","P","P","P","S","P","P","P","P","A","A","S","P","S","P","P","P","S","P","P"]},{"no":23,"name":"Mr Khushal Pareta","emp":"348858","loc":"Juhu","cls":["A","A","A"],"on":["P","S","S","A","S","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A"]},{"no":24,"name":"Ms Neha Saini","emp":"344545","loc":"Kharghar","cls":["P","P","P"],"on":["P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P"]},{"no":25,"name":"Mr Nihal Chhetri","emp":"346766","loc":"Juhu","cls":["P","A","A"],"on":["P","P","P","A","A","P","P","A","A","S","P","A","S","A","P","S","P","S","P","P","P"]},{"no":26,"name":"Mr Nirmal Dilip Jain","emp":"348081","loc":"Kharghar","cls":["P","P","P"],"on":["P","P","P","S","P","P","P","P","P","A","A","S","A","A","A","A","A","A","A","A","A"]},{"no":27,"name":"Mr Onkar Ajit Pawar","emp":"348867","loc":"Juhu","cls":["P","A","P"],"on":["S","P","P","A","P","P","P","P","A","P","A","P","S","P","S","P","P","P","A","P","P"]},{"no":28,"name":"Mr Pranay Jagdish Patil","emp":"347654","loc":"Kharghar","cls":["A","A","A"],"on":["P","P","P","P","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A"]},{"no":29,"name":"Mr Prasad Rajkumar Kunte","emp":"347505","loc":"Juhu","cls":["A","A","P"],"on":["P","P","P","A","P","P","P","P","A","A","A","P","P","P","P","P","P","P","A","P","P"]},{"no":30,"name":"Dr Pravin Bhaskar Ramteke","emp":"344055","loc":"Kharghar","cls":["A","P","P"],"on":["P","P","P","P","P","P","P","P","P","P","P","P","A","P","P","S","A","A","S","P","A"]},{"no":31,"name":"Mr Rahul Batham","emp":"348374","loc":"Juhu","cls":["P","A","A"],"on":["P","S","S","A","S","P","A","A","P","A","S","S","A","A","A","A","A","P","P","P","P"]},{"no":32,"name":"Mr Rahul Bhaskar Chaudhari","emp":"344993","loc":"Kharghar","cls":["A","A","A"],"on":["P","P","P","S","P","P","P","A","S","A","S","P","P","A","S","P","P","P","P","P","P"]},{"no":33,"name":"Mr Rahul Gopal Patil","emp":"348417","loc":"Kharghar","cls":["P","A","P"],"on":["P","P","P","P","P","P","P","P","P","P","P","A","P","P","P","S","P","P","P","P","P"]},{"no":34,"name":"Mr Rakesh Prabhakar Bhol","emp":"347177","loc":"Juhu","cls":["P","A","P"],"on":["P","P","P","P","P","P","S","A","P","P","P","P","P","P","S","S","P","P","P","P","P"]},{"no":35,"name":"Mr Rohan Rajendra Kalaskar","emp":"348222","loc":"Kharghar","cls":["P","P","P"],"on":["P","P","P","P","P","P","P","P","P","P","P","S","A","A","P","P","P","P","P","P","P"]},{"no":36,"name":"Mr Roshan Bhopal Sharma","emp":"347175","loc":"Kharghar","cls":["A","A","A"],"on":["P","P","P","A","P","P","P","P","S","A","P","P","P","P","S","P","P","P","P","P","P"]},{"no":37,"name":"Mr Rushikesh Chhoturam Ghuge","emp":"348658","loc":"Juhu","cls":["P","P","A"],"on":["P","P","P","S","P","P","P","A","P","S","A","A","A","A","A","A","A","A","P","P","S"]},{"no":38,"name":"Mr Rushikesh Kalyan Doud","emp":"348866","loc":"Juhu","cls":["P","A","P"],"on":["A","P","P","A","P","P","P","A","P","P","P","P","P","P","P","S","A","P","P","P","P"]},{"no":39,"name":"Mr Sagar Chandrakant Jadhav","emp":"345583","loc":"Kharghar","cls":["P","A","A"],"on":["P","P","P","P","S","S","P","P","P","P","P","S","P","P","S","S","P","S","S","P","P"]},{"no":40,"name":"Mr Sahil Santosh Karande","emp":"349696","loc":"Kharghar","cls":["P","P","A"],"on":["P","P","P","P","P","P","P","P","P","P","P","A","P","P","P","P","P","A","P","A","P"]},{"no":41,"name":"Ms Sakshi Kishor Gaddamwar","emp":"347701","loc":"Kharghar","cls":["P","P","P"],"on":["A","P","P","P","P","P","P","P","P","S","S","A","A","P","P","P","P","P","P","P","P"]},{"no":42,"name":"Mr Samarth Gyanprakash Pandey","emp":"349884","loc":"Juhu","cls":["P","A","P"],"on":["P","P","P","A","P","P","A","A","A","A","P","P","P","P","A","A","S","P","S","P","P"]},{"no":43,"name":"Mr Sandesh Subhash Jadhav","emp":"348441","loc":"Juhu","cls":["P","P","P"],"on":["P","P","A","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","S","P","P"]},{"no":44,"name":"Ms Sanjyot Shrinivas Sawant","emp":"348448","loc":"Kharghar","cls":["P","A","A"],"on":["P","P","P","P","P","P","P","P","A","A","P","P","P","P","P","P","A","P","P","P","P"]},{"no":45,"name":"Ms Shalaka Parab","emp":"344684","loc":"Juhu","cls":["A","A","A"],"on":["A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A"]},{"no":46,"name":"Mr Shilbhushan Siddhartha Khanderao","emp":"346285","loc":"Kharghar","cls":["P","A","A"],"on":["P","P","P","P","P","P","P","P","P","P","A","P","P","P","S","P","P","S","P","P","P"]},{"no":47,"name":"Mr Shivhar Ramkisan Admane","emp":"345540","loc":"Kharghar","cls":["P","P","P"],"on":["P","P","P","P","P","S","P","P","A","P","P","P","P","P","S","S","P","P","P","P","P"]},{"no":48,"name":"Mr Shivraj Singh","emp":"349903","loc":"Kharghar","cls":["P","P","P"],"on":["P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","S","P","P","P"]},{"no":49,"name":"Ms Shrishti Singh","emp":"345257","loc":"Juhu","cls":["P","P","P"],"on":["S","P","P","A","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P","P"]},{"no":50,"name":"Mr Shubham Sidharth Wadhave","emp":"346215","loc":"Juhu","cls":["P","A","P"],"on":["P","P","P","P","P","P","P","P","P","P","S","P","P","P","P","P","P","P","P","P","P"]},{"no":51,"name":"Mr Sneh Vilas Parab","emp":"347589","loc":"Juhu","cls":["P","A","P"],"on":["P","P","P","S","P","P","P","P","A","S","P","P","P","P","P","P","S","S","S","A","P"]},{"no":52,"name":"Mr Sudarshan Anil Sangale","emp":"348371","loc":"Juhu","cls":["P","A","A"],"on":["P","P","P","A","P","P","P","P","P","A","P","S","P","P","P","P","P","P","S","P","S"]},{"no":53,"name":"Mr Suraj Kumar Shankhwar","emp":"345520","loc":"Juhu","cls":["P","P","P"],"on":["P","P","P","P","P","P","P","P","P","A","P","P","P","P","P","A","P","P","P","P","P"]},{"no":54,"name":"Mr Sushant Ravindra Borkar","emp":"350304","loc":"Juhu","cls":["P","A","P"],"on":["P","P","P","P","P","P","P","A","A","P","P","P","A","P","S","P","P","S","P","P","P"]},{"no":55,"name":"Mr Suyash Santosh Suvare","emp":"347146","loc":"Kharghar","cls":["P","A","P"],"on":["P","P","P","P","P","P","S","P","P","P","P","P","A","P","P","P","A","P","P","P","A"]},{"no":57,"name":"Mr Tanmay Mahendra Elinje","emp":"349778","loc":"Kharghar","cls":["P","P","P"],"on":["P","A","P","P","P","P","A","P","P","A","P","S","P","P","P","P","P","P","S","P","A"]},{"no":58,"name":"Ms Trupti Keshav Badhekar","emp":"344108","loc":"Kharghar","cls":["P","P","P"],"on":["P","P","P","P","P","P","P","A","P","P","P","P","P","P","P","P","A","P","P","A","P"]},{"no":59,"name":"Mr Vaibhav Sunil Shinde","emp":"346905","loc":"Juhu","cls":["P","P","P"],"on":["P","P","P","A","P","P","P","P","P","P","P","P","P","P","P","S","S","P","P","P","P"]},{"no":60,"name":"Mr Vinay Vijay Jadhav","emp":"345598","loc":"Kharghar","cls":["P","A","P"],"on":["P","P","P","S","S","P","A","P","P","S","S","S","A","S","S","A","P","P","A","P","S"]},{"no":61,"name":"Mr Yogesh Suryakant Amle","emp":"346233","loc":"Kharghar","cls":["P","A","P"],"on":["P","P","P","P","A","P","A","P","P","P","S","A","P","P","P","A","S","A","A","A","A"]}]};
+var CL=['5 Sep','19 Sep','9 Oct'],TARGET=75,AS_OF='12 Oct 2026';
+var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function dt(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+function fs(s){var d=dt(s);return d.getDate()+' '+MO[d.getMonth()];}
+function sh(n){return n.replace(/^(Mr|Ms|Dr)\s+/,'');}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function $(s){return document.getElementById(s);}
+function sum(a){return a.reduce(function(x,y){return x+y;},0);}
+function cnt(a,v){return a.filter(function(x){return x===v;}).length;}
+function pc(a,b){return b?Math.round(a*100/b):0;}
+function tone(v){return v>=TARGET?'ok':v>=50?'warn':'bad';}
+function plural(n,w,ws){return n+' '+(n===1?w:(ws||w+'s'));}
+
+var D=DATA.dates,P=DATA.people,S=D.length,N=P.length;
+/* "recent" = sessions in the last 14 days of data */
+var lastDay=dt(D[S-1]),recentIdx=D.map(function(d,i){return (lastDay-dt(d))/864e5<14?i:-1;}).filter(function(i){return i>=0;});
+P.forEach(function(p){p.P=cnt(p.on,'P');p.S=cnt(p.on,'S');p.pct=pc(p.P,S);p.cP=cnt(p.cls,'P');p.cA=cnt(p.cls,'A');
+ p.rP=recentIdx.filter(function(i){return p.on[i]==='P';}).length;p.rpct=pc(p.rP,recentIdx.length);
+ p.last=-1;p.on.forEach(function(x,i){if(x==='P')p.last=i;});
+ p.onReg=p.pct>=TARGET;p.clReg=p.cP>=2;});
+var per=D.map(function(_,i){return P.filter(function(p){return p.on[i]==='P';}).length;});
+var overall=pc(sum(per),N*S);
+var W=[];D.forEach(function(d,i){var x=dt(d),m=new Date(x);m.setDate(x.getDate()-((x.getDay()+6)%7));var w=W[W.length-1];if(!w||w.k!==+m){w={k:+m,m:m,idx:[]};W.push(w);}w.idx.push(i);});
+W.forEach(function(w){w.v=Math.round(sum(w.idx.map(function(i){return per[i];}))/w.idx.length*100/N);});
+var cls=[0,1,2].map(function(i){return P.filter(function(p){return p.cls[i]==='P';}).length;});
+var leave=[0,1,2].map(function(i){return P.filter(function(p){return p.cls[i]==='L';}).length;});
+var clsPct=cls.map(function(c){return pc(c,N);});
+var wFirst=W[0].v,wLast=W[W.length-1].v,wPrev=W[W.length-2].v,wLow=Math.min.apply(null,W.map(function(w){return w.v;}));
+var totS=sum(P.map(function(p){return p.S;})),totJoin=totS+sum(per);
+var early=P.filter(function(p){return p.S>=5;}).sort(function(a,b){return b.S-a.S;});
+
+/* follow-up categories, checked in order; each person lands in the first that applies */
+var CATS=[
+ {id:'enrol',t:'Check enrolment',a:'Never joined any Zoom session and missed every lecture. Confirm with the section head whether they are still on the course or on long leave.',f:function(p){return p.P===0;}},
+ {id:'stopped',t:'Stopped attending',a:'Joined earlier but absent from all of the last 5 Zoom sessions. Call to find out why and share the recordings they missed.',f:function(p){return cnt(p.on.slice(-5),'P')===0;}},
+ {id:'low',t:'Attending less than half',a:'Below 50% on Zoom. Agree a minimum attendance commitment with them and their reporting officer.',f:function(p){return p.pct<50;}},
+ {id:'class',t:'Skipping classroom lectures',a:'Attends at least half the Zoom sessions but missed all 3 lectures. Check travel or duty clashes on lecture days.',f:function(p){return p.cA===3;}}];
+var WATCH={t:'Watch list',a:'Not urgent yet: Zoom 50 to 74%, missed 2 of 3 lectures, or often leaving early.',f:function(p){return p.pct<TARGET||p.cA>=2||p.S>=5;}};
+P.forEach(function(p){p.cat=null;for(var i=0;i<CATS.length;i++){if(CATS[i].f(p)){p.cat=CATS[i].id;break;}}p.watch=!p.cat&&WATCH.f(p);});
+var urgent=P.filter(function(p){return p.cat;}),watch=P.filter(function(p){return p.watch;});
+
+/* engagement groups */
+var G=[
+ {k:'k1',t:'Fully engaged',d:'Regular on Zoom and in class',f:function(p){return p.onReg&&p.clReg;}},
+ {k:'k2',t:'Zoom only',d:'Regular on Zoom, misses lectures',f:function(p){return p.onReg&&!p.clReg;}},
+ {k:'k3',t:'Class only',d:'Comes to lectures, irregular on Zoom',f:function(p){return !p.onReg&&p.clReg;}},
+ {k:'k4',t:'Irregular in both',d:'Below target on Zoom and in class',f:function(p){return !p.onReg&&!p.clReg;}}];
+G.forEach(function(g){g.p=P.filter(g.f);});
+
+var LOC=['Kharghar','Juhu'].map(function(l){var g=P.filter(function(p){return p.loc===l;});
+ return{l:l,n:g.length,on:pc(sum(g.map(function(p){return p.P;})),g.length*S),
+  rec:pc(sum(g.map(function(p){return p.rP;})),g.length*recentIdx.length),
+  c:[0,1,2].map(function(i){return pc(g.filter(function(p){return p.cls[i]==='P';}).length,g.length);}),
+  full:g.filter(G[0].f).length,urg:g.filter(function(p){return p.cat;}).length};});
+
+/* ---------- summary ---------- */
+$('verdict').innerHTML='Zoom attendance is <mark class="g">recovering to '+wLast+'%</mark>, close to the 75% target, but classroom turnout is <mark>'+clsPct[2]+'%</mark> and <mark>'+urgent.length+' staff</mark> need a call this week.';
+$('asof').textContent=S+' Zoom sessions ('+fs(D[0])+' to '+fs(D[S-1])+') and 3 classroom lectures · '+N+' staff · updated '+AS_OF;
+function gap(v){var d=v-TARGET;return d>=0?'<span class="badge b-ok">On target</span>':'<span class="badge b-'+(v>=50?'warn':'bad')+'">'+(-d)+' pts below target</span>';}
+$('kpis').innerHTML=[
+ ['Zoom, this week',wLast+'<small>%</small> '+gap(wLast),'Last week '+wPrev+'%. First week '+wFirst+'%.',tone(wLast)],
+ ['Classroom, latest lecture',clsPct[2]+'<small>%</small> '+gap(clsPct[2]),'9 Oct: '+cls[2]+' of '+N+'. First lecture '+clsPct[0]+'%.',tone(clsPct[2])],
+ ['Need a call now',urgent.length+'<small> staff</small>','Plus '+watch.length+' on the watch list','bad'],
+ ['Fully engaged',G[0].p.length+'<small> of '+N+'</small>','Regular on Zoom and in class','ok']
+].map(function(k){return '<div class="kpi"><div class="l">'+k[0]+'</div><div class="v '+k[3]+'">'+k[1]+'</div><div class="n">'+k[2]+'</div></div>';}).join('');
+
+/* ---------- trend ---------- */
+$('trendH').textContent='Zoom fell from '+wFirst+'% to '+wLow+'% in September and is back to '+wLast+'%. Classroom is still well below its first lecture.';
+function chart(el,xs,vals,labels){
+ $(el).innerHTML='<div class="bars">'+vals.map(function(v){return '<div class="bar'+(v<TARGET?' below':'')+'"><b style="bottom:calc('+v+'% + 3px)">'+v+'%</b><i style="height:'+v+'%"></i></div>';}).join('')+'</div><div class="target" style="bottom:'+TARGET+'%"></div>';
+ $(xs).innerHTML=labels.map(function(l){return '<span>'+l+'</span>';}).join('');}
+chart('wk','wkx',W.map(function(w){return w.v;}),W.map(function(w){return 'Wk of<br>'+w.m.getDate()+' '+MO[w.m.getMonth()];}));
+chart('lec','lecx',clsPct,CL.map(function(c,i){return c+'<br>'+cls[i]+' of '+N;}));
+$('lecnote').textContent='The 19 Sep lecture had the lowest turnout, with '+cls[1]+' of '+N+' present.'+(leave[2]?' On 9 Oct, '+plural(leave[2],'person was','people were')+' on approved leave.':'');
+$('sess').innerHTML=D.map(function(d,i){return '<div class="hb"><span>'+fs(d)+'</span><div class="t"><i style="width:'+pc(per[i],N)+'%"></i></div><b>'+per[i]+'</b></div>';}).join('');
+$('earlyH').textContent=pc(totS,totJoin)+'% of Zoom joins ended early';
+$('earlyS').textContent='These staff joined but left before the 60-minute minimum, so the visit does not count as present. '+early.length+' people did this 5 times or more:';
+$('early').innerHTML=early.map(function(p){return '<span class="chip">'+esc(sh(p.name))+' · '+p.S+' times</span>';}).join('');
+
+/* ---------- groups ---------- */
+$('grpH').textContent=G[0].p.length+' of '+N+' staff are fully engaged and '+G[3].p.length+' are irregular in both modes.';
+$('grps').innerHTML=G.map(function(g){return '<div class="grp '+g.k+'"><div class="num">'+g.p.length+'</div><div class="ti">'+g.t+'</div><p>'+g.d+' · '+pc(g.p.length,N)+'% of staff</p>'+
+ '<details><summary>Names</summary><div class="chips">'+g.p.map(function(p){return '<span class="chip">'+esc(sh(p.name))+'</span>';}).join('')+'</div></details></div>';}).join('');
+
+/* ---------- locations ---------- */
+var hl=LOC[0].on>=LOC[1].on?LOC[0]:LOC[1],ll=hl===LOC[0]?LOC[1]:LOC[0];
+$('locH').textContent=hl.l+' leads on Zoom ('+hl.on+'% against '+ll.on+'%). Both locations fell to under half at the 19 Sep lecture.';
+function cell(v){return '<td class="r"><b class="'+tone(v)+'">'+v+'%</b></td>';}
+var allRec=pc(sum(P.map(function(p){return p.rP;})),N*recentIdx.length);
+$('loct').innerHTML='<thead><tr><th>Location</th><th class="r">Staff</th><th class="r">Zoom, overall</th><th class="r">Zoom, last 2 wks</th>'+CL.map(function(c){return '<th class="r">Class '+c+'</th>';}).join('')+'<th class="r">Fully engaged</th><th class="r">Need a call</th></tr></thead><tbody>'+
+ LOC.map(function(l){return '<tr><td><b>'+l.l+'</b></td><td class="r">'+l.n+'</td>'+cell(l.on)+cell(l.rec)+l.c.map(cell).join('')+'<td class="r">'+l.full+'</td><td class="r bad"><b>'+l.urg+'</b></td></tr>';}).join('')+
+ '<tr><td><b>All staff</b></td><td class="r">'+N+'</td>'+cell(overall)+cell(allRec)+clsPct.map(cell).join('')+'<td class="r">'+G[0].p.length+'</td><td class="r bad"><b>'+urgent.length+'</b></td></tr></tbody>';
+
+/* ---------- follow-up ---------- */
+var STATUS={},db=null,canWrite=false;
+var ST=[['todo','To contact'],['contacted','Contacted'],['resolved','Resolved']];
+$('fuH').textContent=urgent.length+' staff need a call, grouped by what to do.';
+$('fuS').textContent='Each group has a suggested action. The strip shows every Zoom session, oldest first. "Last 2 weeks" shows whether someone is improving or slipping.';
+function card(p){var st=(STATUS['s'+p.no]||{}),s=st.status||'todo';
+ var trend=p.rpct-p.pct,tr=Math.abs(trend)<5?'steady':trend>0?'<span class="ok">up</span>':'<span class="bad">down</span>';
+ return '<div class="pc'+(s==='resolved'?' done':'')+'"><div class="who"><div><div class="nm">'+esc(sh(p.name))+'</div><div class="m">'+p.loc+' · '+p.emp+'</div></div><div class="pv '+tone(p.pct)+'">'+p.pct+'%<small>Zoom overall</small></div></div>'+
+ '<div class="facts"><span>Last 2 weeks <b>'+p.rpct+'%</b> ('+tr+')</span><span>'+(p.last<0?'<b>Never joined</b>':'Last joined <b>'+fs(D[p.last])+'</b>')+'</span>'+(p.S?'<span>Left early <b>'+p.S+'×</b></span>':'')+'</div>'+
+ '<div class="strip" aria-label="Zoom history">'+p.on.map(function(x,i){return '<i class="'+x+'" title="'+fs(D[i])+'"></i>';}).join('')+'</div>'+
+ '<div class="facts"><span>Class '+p.cls.map(function(x,i){return '<span class="mk '+x+'" title="'+CL[i]+'">'+x+'</span>';}).join('')+'</span></div>'+
+ (db?'<div class="status"><select id="st-'+p.no+'" data-no="'+p.no+'" aria-label="Follow-up status for '+esc(sh(p.name))+'"'+(canWrite?'':' disabled')+'>'+ST.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===s?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>'+
+  '<input id="nt-'+p.no+'" data-no="'+p.no+'" placeholder="Note, e.g. on duty till 20 Oct" value="'+esc(st.note||'')+'"'+(canWrite?'':' disabled')+' aria-label="Note">'+(st.at?'<span class="saved">Updated '+esc(st.at)+'</span>':'')+'</div>':'')+
+ '</div>';}
+var showWatch=false;
+function renderFU(){
+ $('cats').innerHTML=CATS.map(function(c){var list=urgent.filter(function(p){return p.cat===c.id;});if(!list.length)return '';
+  return '<div class="cat"><h3>'+c.t+' <span class="badge b-bad">'+list.length+'</span></h3><p class="act">'+c.a+'</p><div class="pcs">'+list.sort(function(a,b){return a.P-b.P;}).map(card).join('')+'</div></div>';}).join('');
+ $('watchWrap').innerHTML=(showWatch?'<div class="cat"><h3>'+WATCH.t+' <span class="badge b-warn">'+watch.length+'</span></h3><p class="act">'+WATCH.a+'</p><div class="pcs">'+watch.sort(function(a,b){return a.P-b.P;}).map(card).join('')+'</div></div>':'')+
+  '<button class="btn" id="wb" type="button">'+(showWatch?'Hide watch list':'Show watch list ('+watch.length+')')+'</button>';
+ $('wb').onclick=function(){showWatch=!showWatch;renderFU();};
+ var c={todo:0,contacted:0,resolved:0};urgent.forEach(function(p){c[(STATUS['s'+p.no]||{}).status||'todo']++;});
+ $('prog').innerHTML=db?'<span><b>'+c.contacted+'</b> contacted · <b>'+c.resolved+'</b> resolved · <b>'+c.todo+'</b> still to call</span><div class="pbar" aria-hidden="true"><i style="width:'+pc(c.resolved,urgent.length)+'%;background:var(--ok)"></i><i style="width:'+pc(c.contacted,urgent.length)+'%;background:var(--accent)"></i></div>':
+  '<span class="mut">Open the shared link to record who has been contacted.</span>';
+}
+renderFU();
+function today(){var d=new Date();return d.getDate()+' '+MO[d.getMonth()];}
+async function save(no,patch){if(!db||!canWrite)return;var cur=Object.assign({},STATUS['s'+no]||{}),next=Object.assign({status:'todo',note:''},cur,patch,{at:today()});
+ if(cur.status===next.status&&(cur.note||'')===next.note)return;
+ STATUS['s'+no]=next;renderFU();
+ try{await db.doc('followup/s'+no).set(next);}catch(e){if(e&&e.code==='invalid_argument'){canWrite=false;renderFU();}}}
+document.addEventListener('change',function(e){var t=e.target;if(t.id&&t.id.indexOf('st-')===0)save(+t.dataset.no,{status:t.value});if(t.id&&t.id.indexOf('nt-')===0)save(+t.dataset.no,{note:t.value.trim().slice(0,200)});});
+(async function(){try{if(!window.claude||!claude.use)return;db=await claude.use('db');if(!db)return;
+ var u=await claude.use('user');var w=u&&u.can?await u.can('data.write'):null;canWrite=w!==false;
+ renderFU();
+ db.collection('followup').onSnapshot(function(snap){var s={};snap.docs.forEach(function(d){if(d.exists)s[d.id]=d.data();});
+  var a=document.activeElement;if(a&&a.id&&a.id.indexOf('nt-')===0)return; STATUS=s;renderFU();},function(){db=null;renderFU();});
+}catch(e){db=null;renderFU();}})();
+
+/* ---------- lookup ---------- */
+function reg(){var q=$('q').value.trim().toLowerCase(),fl=$('fl').value,so=$('so').value;
+ if(!q&&!fl&&so==='no'){$('reg').innerHTML='<tbody><tr><td class="hint">Type a name or pick a location to see staff here. Sort by Zoom to list everyone.</td></tr></tbody>';return;}
+ var r=P.filter(function(p){return (!fl||p.loc===fl)&&(!q||p.name.toLowerCase().indexOf(q)>=0||p.emp.indexOf(q)>=0);});
+ r.sort(function(a,b){return so==='lo'?a.P-b.P||a.no-b.no:so==='hi'?b.P-a.P||a.no-b.no:a.no-b.no;});
+ $('reg').innerHTML='<thead><tr><th>S.No</th><th>Name</th><th>Location</th><th class="r">Zoom</th><th>Last 2 wks</th><th>Zoom sessions</th><th>Class '+CL.join(' · ')+'</th></tr></thead><tbody>'+
+ (r.length?r.map(function(p){return '<tr><td class="c0">'+p.no+'</td><td class="c1">'+esc(sh(p.name))+'</td><td class="c2">'+p.loc+' · '+p.emp+'</td><td class="c3 r"><b class="'+tone(p.pct)+'">'+p.pct+'%</b><br><span class="mut" style="font-size:12px">'+p.P+' of '+S+'</span></td><td class="c4"><span class="mut" style="font-size:13px">Last 2 wks </span><b class="'+tone(p.rpct)+'">'+p.rpct+'%</b></td><td class="s"><div class="strip">'+p.on.map(function(x,i){return '<i class="'+x+'" title="'+fs(D[i])+'"></i>';}).join('')+'</div></td><td class="c5" style="white-space:nowrap">'+p.cls.map(function(x,i){return '<span class="mk '+x+'" title="'+CL[i]+'">'+x+'</span>';}).join('')+'</td></tr>';}).join(''):'<tr><td class="hint">No staff match that search.</td></tr>')+'</tbody>';}
+['q','fl','so'].forEach(function(id){$(id).addEventListener('input',reg);});reg();
+
+var links=[].slice.call(document.querySelectorAll('nav a'));
+if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)links.forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+e.target.id);});});},{rootMargin:'-40% 0px -55% 0px'});
+ document.querySelectorAll('main section').forEach(function(s){io.observe(s);});}
+
+$('foot').innerHTML='<b>How this is measured.</b> Zoom: participant reports matched to the staff list. Present means the person stayed at least 60 minutes; joining for less counts as left early, not present. Zoom % is sessions present out of '+S+'. Weekly bars average the sessions held that week. Last 2 weeks covers the '+recentIdx.length+' sessions from '+fs(D[recentIdx[0]])+' to '+fs(D[S-1])+'. Classroom: manual register; L is approved leave and is not counted as present. Target: 75% for both. Follow-up groups are checked in order (enrolment, stopped, below 50%, skipping lectures), so each person appears once.';
+</script>
+
+</body></html>

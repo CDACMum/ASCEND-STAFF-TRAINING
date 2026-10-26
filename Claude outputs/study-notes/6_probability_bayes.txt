@@ -1,0 +1,226 @@
+Probability from counts · AND / OR rules · Independent vs mutually exclusive · Conditional probability · Total probability · Bayes' theorem
+
+On 22 October Sudeep Bhargava taught probability by working numbers out together: he put a question, students typed fractions into the chat (48/136, 38/48, 3/57 …), and the class closed with a three-supplier problem solved with Bayes' theorem. The table of 136 cases was shown on screen and is not in the chat record, so this note re-teaches the same types of question on a table of its own (clearly marked), and works the supplier problem exactly as set in class.
+
+How to read the grades: 🟢 start here · 🔵 core · 🟠 go deeper · 🔴 stretch
+
+────────────────────────────────────────
+🟢 1 · What a probability is
+────────────────────────────────────────
+Probability = (number of outcomes we want) ÷ (total number of equally likely outcomes). It is always between 0 and 1.
+
+• 0 means impossible, 1 means certain.
+• When you read a table of counts, the probability is simply a fraction of the counts: that is what the class typed as 48/136, 20/136 and 95/136 — "this many out of that many".
+• The probability that an event does NOT happen is 1 − P(event). This is called the complement.
+
+────────────────────────────────────────
+🔵 2 · Reading probabilities from a table (worked example of our own)
+────────────────────────────────────────
+Practice table — 200 trainees, by batch and by result in the Python test. (Our own numbers, not from class.)
+
+                 Passed   Failed   Total
+    Batch 1        48       12       60
+    Batch 2        52       28       80
+    Batch 3        30       30       60
+    Total         130       70      200
+
+The three kinds of probability, each read straight off the table:
+
+• Marginal — one variable only, divide by the grand total 200.
+    P(Passed) = 130/200 = 0.65        P(Batch 2) = 80/200 = 0.40
+• Joint — "A AND B": the single cell where both hold, divide by 200.
+    P(Batch 2 AND Passed) = 52/200 = 0.26
+• Conditional — "A GIVEN B": restrict to the row (or column) of B and divide by ITS total.
+    P(Passed | Batch 2) = 52/80 = 0.65
+    P(Batch 1 | Passed) = 48/130 = 0.369
+
+Compare the last two: the condition changes the denominator. This is the same move as in the chat: 8/136 is a joint probability (denominator = everyone), while 8/42 is a conditional one (denominator = only the 42 people in the condition, a smaller group).
+
+@run Marginal, joint and conditional from a table
+    import pandas as pd
+
+    t = pd.DataFrame({"Passed": [48, 52, 30], "Failed": [12, 28, 30]},
+                     index=["Batch 1", "Batch 2", "Batch 3"])
+    N = t.values.sum()
+    print(t, "\n")
+    print("P(Passed)              = %d/%d = %.3f" % (t.Passed.sum(), N, t.Passed.sum()/N))
+    print("P(Batch 2)             = %d/%d = %.3f" % (t.loc['Batch 2'].sum(), N, t.loc['Batch 2'].sum()/N))
+    print("P(Batch 2 AND Passed)  = %d/%d = %.3f" % (t.loc['Batch 2','Passed'], N, t.loc['Batch 2','Passed']/N))
+    print("P(Passed | Batch 2)    = %d/%d = %.3f" % (t.loc['Batch 2','Passed'], t.loc['Batch 2'].sum(),
+                                                  t.loc['Batch 2','Passed']/t.loc['Batch 2'].sum()))
+    print("P(Batch 1 | Passed)    = %d/%d = %.3f" % (t.loc['Batch 1','Passed'], t.Passed.sum(),
+                                                  t.loc['Batch 1','Passed']/t.Passed.sum()))
+
+────────────────────────────────────────
+🔵 3 · The AND rule and the OR rule
+────────────────────────────────────────
+OR (addition rule)
+
+    P(A or B) = P(A) + P(B) − P(A and B)
+
+We subtract the overlap because people in both A and B were counted twice. From our table:
+P(Batch 1 or Passed) = 60/200 + 130/200 − 48/200 = 0.30 + 0.65 − 0.24 = 0.71.
+
+AND (multiplication rule)
+
+    P(A and B) = P(A) × P(B | A)
+
+Read it as: first A happens, then B happens GIVEN that A has happened. Example: P(Batch 2 and Passed) = P(Batch 2) × P(Passed | Batch 2) = 0.40 × 0.65 = 0.26, which matches the joint probability in the table.
+
+This is also how the first product was handled in the supplier problem: P(from A and defective) = 0.50 × 0.03 = 0.015.
+
+────────────────────────────────────────
+🔵 4 · Independent or mutually exclusive? Two ideas that are often confused
+────────────────────────────────────────
+The class was asked which word fits and students answered "independent" and "mutually exclusive". Here is the difference.
+
+    Mutually exclusive: A and B cannot happen together.       P(A and B) = 0
+        Example: one product comes from supplier A OR from supplier B, never both.
+    Independent: knowing A tells you nothing about B.          P(B | A) = P(B), so P(A and B) = P(A) × P(B)
+        Example: two coins tossed separately.
+
+Key facts:
+• Mutually exclusive events are NOT independent (if A has happened, B certainly has not).
+• The OR rule simplifies for mutually exclusive events: P(A or B) = P(A) + P(B), no overlap to subtract. That is why the three supplier probabilities could simply be added.
+• Test for independence with the table: is P(Passed | Batch 2) equal to P(Passed)? Here 0.65 = 0.65, so Passed and Batch 2 are independent. For Batch 1, P(Passed | Batch 1) = 48/60 = 0.80 ≠ 0.65, so Batch 1 and Passed are NOT independent.
+
+────────────────────────────────────────
+🔵 5 · The supplier problem — set in class
+────────────────────────────────────────
+Three suppliers for a particular raw material: A, B and C.
+• A supplies 50% of my requirements
+• B supplies 30% of my requirements
+• C supplies 20% of my requirements
+• If the product comes from A, the probability of being defective is 3%
+• If the product comes from B, the probability of being defective is 4%
+• If the product comes from C, the probability of being defective is 5%
+I find a defective product in my assembly. What is the probability that it came from A?
+
+Think it through in two stages.
+
+Stage 1 — "if I pick a product at random, how likely is it to be defective?" A defective product can reach me through any of the three suppliers, so add the three joint probabilities (they are mutually exclusive: a product has exactly one supplier).
+
+    P(A and D) = 0.50 × 0.03 = 0.015
+    P(B and D) = 0.30 × 0.04 = 0.012
+    P(C and D) = 0.20 × 0.05 = 0.010
+    P(D) = 0.015 + 0.012 + 0.010 = 0.037        (3.7% of all products are defective)
+
+This is the LAW OF TOTAL PROBABILITY: P(D) = Σ P(supplier) × P(D | supplier).
+
+Stage 2 — "given that THIS product is defective, where did it come from?" Take the share of the defects that comes from A:
+
+    P(A | D) = P(A and D) / P(D) = 0.015 / 0.037 = 0.405
+
+The same for the others:
+
+    Supplier   Share of supply   P(D|supplier)   Joint P(and D)   Share of defects P(supplier | D)
+    A              0.50              0.03             0.015              0.405
+    B              0.30              0.04             0.012              0.324
+    C              0.20              0.05             0.010              0.270
+    Total          1.00                               0.037              1.000
+
+Notice what the table tells a buyer: C supplies only 20% of the material but is the source of 27% of the defects, because its defect rate (5%) is the highest. A supplies half the material but only 40.5% of the defects. The posteriors always add up to 1.
+
+(A slip seen in the class chat: the final division was typed as 0.015/0.37. The denominator is 0.037, not 0.37.)
+
+@run The supplier problem step by step
+    import pandas as pd
+
+    share = pd.Series({"A": 0.50, "B": 0.30, "C": 0.20})          # P(supplier)
+    defect = pd.Series({"A": 0.03, "B": 0.04, "C": 0.05})         # P(defective | supplier)
+
+    joint = share * defect                                       # P(supplier AND defective)
+    p_d = joint.sum()                                            # total probability of a defective
+    posterior = joint / p_d                                      # P(supplier | defective)
+
+    out = pd.DataFrame({"share": share, "P(D|s)": defect, "joint": joint, "P(s|D)": posterior.round(4)})
+    print(out)
+    print("\nP(defective) = %.3f" % p_d)
+    print("P(A | defective) = %.4f" % posterior["A"])
+    print("posteriors add up to", round(posterior.sum(), 6))
+
+────────────────────────────────────────
+🔵 6 · Bayes' theorem in one line
+────────────────────────────────────────
+The supplier problem is Bayes' theorem. Written once, in symbols:
+
+    P(A | D) = P(D | A) × P(A) / P(D)
+
+with P(D) found by total probability, P(D) = Σ P(D | Ai) × P(Ai).
+
+• P(A) — PRIOR: what you believed before the evidence (A supplies 50%).
+• P(D | A) — LIKELIHOOD: how likely the evidence is if A is the source (3%).
+• P(A | D) — POSTERIOR: what you believe after the evidence (40.5%).
+
+Warning: P(D | A) and P(A | D) are NOT the same thing. 3% of A's products are defective, but 40.5% of the defective products come from A. Mixing the two up is the most common probability mistake.
+
+A second Bayes problem (our own example, to practise): a screening test. 1% of people have a disease. The test is positive for 95% of the people who have it (sensitivity) and also for 5% of healthy people (false positives). A person tests positive. How likely is it that they really have the disease?
+
+    P(disease and +)   = 0.01 × 0.95 = 0.0095
+    P(healthy and +)   = 0.99 × 0.05 = 0.0495
+    P(+)               = 0.0095 + 0.0495 = 0.0590
+    P(disease | +)     = 0.0095 / 0.0590 = 0.161  (about 16%)
+
+Even with a "95% accurate" test, only about 1 positive in 6 is a true case, because healthy people are so much more numerous. This is exactly the precision idea in the Statistics & Model Evaluation note (precision = true positives ÷ all predicted positives).
+
+@run Screening-test Bayes problem, and a simulation to confirm the supplier answer
+    import numpy as np
+
+    # 1. the screening test
+    prior, sens, fpr = 0.01, 0.95, 0.05
+    p_pos = prior*sens + (1-prior)*fpr
+    print("P(disease | positive) = %.3f" % (prior*sens / p_pos))
+
+    # 2. confirm the supplier posterior by simulating 2,000,000 products
+    rng = np.random.default_rng(0)
+    n = 2000000
+    supplier = rng.choice(["A", "B", "C"], n, p=[.5, .3, .2])
+    p_def = np.where(supplier == "A", .03, np.where(supplier == "B", .04, .05))
+    defective = rng.random(n) < p_def
+    print("simulated share of defects      = %.4f" % defective.mean())
+    print("simulated P(A | defective)      = %.4f   (exact 0.4054)" % (supplier[defective] == "A").mean())
+
+────────────────────────────────────────
+🟠 7 · Mistakes to avoid
+────────────────────────────────────────
+• Dividing by the wrong total. Joint → grand total; conditional → total of the condition.
+• Adding probabilities of events that overlap without subtracting the overlap.
+• Multiplying probabilities of events that are not independent without using the conditional probability.
+• Swapping P(D | A) and P(A | D).
+• Forgetting the denominator in Bayes' theorem — it is the TOTAL probability of the evidence, not just one branch.
+• Typing 0.37 for 0.037. Check that the denominator is larger than the numerator.
+
+────────────────────────────────────────
+🔵 8 · Practice questions
+────────────────────────────────────────
+Use the 200-trainee table of section 2.
+Q1. P(Failed)?  P(Batch 3 and Failed)?
+Q2. P(Failed | Batch 3)?  Are Failed and Batch 3 independent?
+Q3. P(Batch 2 or Failed)?
+Q4. Given that a trainee failed, what is the probability that they are from Batch 2?
+Q5. A factory has two machines: M1 makes 60% of items with a 2% defect rate; M2 makes 40% with a 5% defect rate. What is the probability that an item is defective? If an item is defective, how likely is it from M2?
+Q6. Two events are mutually exclusive with P(A) = 0.3 and P(B) = 0.5. Find P(A or B) and P(A and B).
+
+Answers
+A1. 70/200 = 0.35; 30/200 = 0.15.
+A2. 30/60 = 0.50. P(Failed) = 0.35 ≠ 0.50, so NOT independent.
+A3. P(Batch 2) = 0.40, P(Failed) = 0.35, P(Batch 2 and Failed) = 28/200 = 0.14 → 0.40 + 0.35 − 0.14 = 0.61.
+A4. P(Batch 2 | Failed) = 28/70 = 0.40.
+A5. P(D) = 0.6×0.02 + 0.4×0.05 = 0.012 + 0.020 = 0.032. P(M2 | D) = 0.020/0.032 = 0.625.
+A6. P(A or B) = 0.8; P(A and B) = 0.
+
+────────────────────────────────────────
+🟢 9 · One-page cheat sheet
+────────────────────────────────────────
+    P(A)            = favourable / total
+    P(not A)        = 1 − P(A)
+    P(A or B)       = P(A) + P(B) − P(A and B)
+    P(A and B)      = P(A) × P(B | A)
+    P(B | A)        = P(A and B) / P(A)
+    Mutually exclusive: P(A and B) = 0
+    Independent       : P(B | A) = P(B)  and  P(A and B) = P(A)P(B)
+    Total probability : P(D) = Σ P(Ai) P(D | Ai)
+    Bayes             : P(A | D) = P(D | A) P(A) / P(D)
+
+• Joint → divide by the grand total. Conditional → divide by the condition's total.
+• Prior → evidence → posterior.
