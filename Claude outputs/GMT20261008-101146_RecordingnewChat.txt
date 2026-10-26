@@ -1,25 +1,0 @@
-00:17:23	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='salaries')df = df[['rank','yrs_service','salary']]rank_dummy = pd.get_dummies(df['rank'],drop_first=True).astype(int)df = df.drop('rank',axis=1)df = pd.concat([df,rank_dummy],axis=1)
-00:20:36	Sudeep Bhargava:	x = df.drop('salary', axis=1)   # input columnsy = df.salary   # output columnfrom sklearn.linear_model import LinearRegressionregr=LinearRegression()regr.fit(x,y)
-00:23:07	Sudeep Bhargava:	regr.coef_
-00:23:21	Debmalya Paul:	Okay sir
-00:26:13	Sudeep Bhargava:	The first coefficient -158 is for yrs_service.Because the coeff is negative, it indicates that for every unit increasein the years of service, if the rank does not change then the salarywould reduce by 158.
-00:29:28	Sudeep Bhargava:	The second coeff is -14615 is for the AsstProf where ref level is AssocProfBecause the coeff is negative, it indicates that when the rank changesfrom AssocProf to AsstProf, for the same number of yrs_service, thesalary reduces by 14615
-00:30:57	Sudeep Bhargava:	The third coeff is 34613 is for the Prof where ref level is AssocProfBecause the coeff is positive, it indicates that when the rank changesfrom AssocProf to Prof, for the same number of yrs_service, thesalary increases by 34613
-00:37:54	Sudeep Bhargava:	regr.intercept_'''Since the intercept value is 95767, this indicates that when the continus variables are kept at 0 which mean yrs_service = 0AND categorical predictors are set at ref level, which meansrank = AssocProf, then the salary is 95767'''
-00:38:39	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='diabetes')
-00:41:53	Sudeep Bhargava:	df = df[['Glucose','BloodPressure','Age','DietType','Outcome']]
-00:42:44	Sudeep Bhargava:	# 'Glucose','BloodPressure','Age' - coninuous predictors# DietType - categorical predictors# Outcome - binary response
-00:43:50	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='diabetes')df = df[['Glucose','BloodPressure','Age','DietType','Outcome']]# 'Glucose','BloodPressure','Age' - coninuous predictors# DietType - categorical predictors# Outcome - binary responsediet_dummy = pd.get_dummies(df['DietType'],prefix='Diet',drop_first=True).astype(int)df = df.drop('DietType',axis=1)df = pd.concat([df,diet_dummy],axis=1)
-00:51:17	Sudeep Bhargava:	newdf = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='diabetes')diet_counts = pd.DataFrame(newdf.DietType.value_counts())diet_counts.plot(kind='bar')pd.crosstab(newdf.Outcome,newdf.DietType)
-00:59:11	Sudeep Bhargava:	newdf = pd.read_excel('CDAC_DataBook.xlsx', sheet_name='diabetes')diet_counts = pd.DataFrame(newdf.DietType.value_counts())diet_counts.plot(kind='bar')abc = pd.crosstab(newdf.Outcome,newdf.DietType)abc.plot(kind='bar')x1 = newdf.iloc[np.where(df.Age<=35)]resp1 = pd.DataFrame(x1.Outcome.value_counts())resp1.plot(kind='bar')x2 = newdf.iloc[np.where(df.Age>35)]resp2 = pd.DataFrame(x2.Outcome.value_counts())resp2.plot(kind='bar')
-01:01:33	Sudeep Bhargava:	import scipyfrom scipy import statsfrom scipy.stats import chi2_contingencychi2_contingency(abc)
-01:03:34	Debmalya Paul:	Sir, you vouce is slightly breaking
-01:04:00	Debmalya Paul:	Now it's okay sir
-01:08:21	Sudeep Bhargava:	from sklearn.linear_model import LogisticRegressionlog_mod = LogisticRegression()x = df.drop('Outcome', axis=1)y = df.Outcomelog_mod.fit(x,y)
-01:13:30	Trupti Badhekar:	Your voice is breaking
-01:14:44	Sudeep Bhargava:	from sklearn.linear_model import LogisticRegressionlog_mod = LogisticRegression()x = df.drop('Outcome', axis=1)y = df.Outcomelog_mod.fit(x,y)log_mod.coef_'''For Glucose, the coeff is +ve so it indicates that when we increase the Glucoselevel, it will increase the probability of getting diabetesFor Diet_2, the coeff is -ve so it indicates that when we change out Diet from Diet1to Diet2, it decreases the probability of getting diabetes'''
-01:14:59	Debmalya Paul:	now it's better sir
-01:15:46	Rahul Chaudhari:	Thank you sir
-01:37:28	Chirantan Lonkar:	https://www.geeksforgeeks.org/machine-learning/support-vector-machine-algorithm/
-02:24:47	Chirantan Lonkar:	https://www.geeksforgeeks.org/machine-learning/apriori-algorithm/
-02:35:36	Chirantan Lonkar:	https://www.geeksforgeeks.org/data-analysis/principal-component-analysis-pca/

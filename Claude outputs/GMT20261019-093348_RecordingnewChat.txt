@@ -1,45 +1,0 @@
-00:12:47	Shivhar Admane:	yes sir
-00:16:53	Sudeep Bhargava:	sns.barplot(x='MaterialID',y='Quantity',hue='Location', data=df, estimator=np.size)
-00:19:37	Sudeep Bhargava:	sns.histplot(data=df, x='MaterialID', hue='Location', multiple='stack')
-00:25:41	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx',sheet_name='faithful')
-00:27:05	Sudeep Bhargava:	erupt = df.eruptionswait = df.waiting
-00:28:18	Sudeep Bhargava:	plt.hist(erupt)
-00:33:49	Sudeep Bhargava:	# In a bar chart, the x-axis variable is a categorical data# In a bar chart, the bars do not touch each other# In a bar chart, the bars are of equal thickness# In a histogram, the x-axis variable is a continuous data# In a histogram, the bars touch each other# In a histogram , the bars may be of unequal thickness
-00:36:03	Sudeep Bhargava:	my_cats = [1.5,2.4,3.6,4.2,5.5]plt.hist(erupt,bins=my_cats)
-00:36:44	Sudeep Bhargava:	plt.hist(erupt,bins=my_cats,color='black')
-00:39:43	Sudeep Bhargava:	# Histogram of single variable with Seaborn - univariate analysissns.histplot(erupt, color='black', bins=my_cats)
-00:44:14	Sudeep Bhargava:	grpA = erupt[np.where(wait>=np.median(wait))[0]]grpB = erupt[np.where(wait<np.median(wait))[0]]
-00:47:40	Sudeep Bhargava:	grpA = erupt[np.where(wait>=np.median(wait))[0]]grpB = erupt[np.where(wait<np.median(wait))[0]]# Multi-histogram using Matplotlib plt.hist(grpA,bins=my_cats,color='blue',label='Above 50% waiting time')plt.hist(grpB,bins=my_cats,color='black',label='Below 50% waiting time')
-00:57:26	Sudeep Bhargava:	code = []for ctr in erupt:    if ctr >= np.median(erupt):        code.append('A')    else:        code.append('B')df['Category']=code
-01:00:18	Sudeep Bhargava:	code = []for ctr in erupt:    if ctr >= np.median(erupt):        code.append('A')    else:        code.append('B')df['Category']=code# Multi-histogram using Seabornsns.histplot(x='eruptions', hue='Category',data=df, bins=my_cats)
-01:06:11	Sudeep Bhargava:	plt.boxplot(erupt)
-01:06:36	Sudeep Bhargava:	sns.boxplot(erupt)
-01:17:16	Sudeep Bhargava:	# Box Plot - single variable - univariate - matplotlibplt.boxplot(erupt)# Adding two outliersmydata = pd.DataFrame([[9,120,'A'],[15,140,'B']], columns=df.columns)df = pd.concat([df, mydata]).reset_index(drop=True)erupt = df.eruptionsplt.boxplot(erupt)# Box Plot - single variable - univariate - seabornsns.boxplot(erupt)# main purpose is to identify if there are any outliers# identify the indices of the outliersUF = np.percentile(erupt,75) + 1.5*(np.percentile(erupt,75) - np.percentile(erupt,25))LF = np.percentile(erupt,25) - 1.5*(np.percentile(erupt,75) - np.percentile(erupt,25))ind_upper = np.where(erupt>UF)[0]ind_lower = np.where(erupt<LF)[0]
-01:18:15	Debmalya Paul:	np.percentile(erupt,75) signifies IQR right sir?
-01:19:01	Sudeep Bhargava:	np.percentile(erupt,75) - np.percentile(erupt,25)
-01:19:02	Debmalya Paul:	Okay sir
-01:19:06	Debmalya Paul:	Reacted to "np.percentile(erup..." with 👍
-01:19:20	Debmalya Paul:	That was Q1 and Q3
-01:19:36	Debmalya Paul:	Okay sir
-01:28:44	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx',sheet_name='faithful')code = []for ctr in erupt:    if ctr >= np.median(erupt):        code.append('A')    else:        code.append('B')df['Category']=code
-01:28:51	Sudeep Bhargava:	dfA = df.iloc[np.where(df.Category=='A')[0]]dfB = df.iloc[np.where(df.Category=='B')[0]]
-01:29:06	Debmalya Paul:	Could you please send the commands alos sir?
-01:29:12	Debmalya Paul:	*comments
-01:29:42	Sudeep Bhargava:	# Box Plot - single variable - univariate - matplotlibplt.boxplot(erupt)# Adding two outliersmydata = pd.DataFrame([[9,120,'A'],[15,140,'B']], columns=df.columns)df = pd.concat([df, mydata]).reset_index(drop=True)erupt = df.eruptionsplt.boxplot(erupt)# Box Plot - single variable - univariate - seabornsns.boxplot(erupt)# main purpose is to identify if there are any outliers# identify the indices of the outliers# UF = Q3 + 1.5*(Q3-Q1)UF = np.percentile(erupt,75) + 1.5*(np.percentile(erupt,75) - np.percentile(erupt,25))# LF = Q1 - 1.5*(Q3-Q1)LF = np.percentile(erupt,25) - 1.5*(np.percentile(erupt,75) - np.percentile(erupt,25))ind_upper = np.where(erupt>UF)[0]ind_lower = np.where(erupt<LF)[0]# Box Plot - two variable - bivariate --> continuous + categorical - matplotlibdfA = df.iloc[np.where(df.Category=='A')[0]]dfB = df.iloc[np.where(df.Category=='B')[0]]
-01:31:35	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx',sheet_name='faithful')code = []for ctr in erupt:    if ctr >= np.median(erupt):        code.append('A')    else:        code.append('B')df['Category']=code
-01:31:38	Sudeep Bhargava:	dfA = df.iloc[np.where(df.Category=='A')[0]]dfB = df.iloc[np.where(df.Category=='B')[0]]
-01:32:38	Debmalya Paul:	Just a mibute sir
-01:34:09	Sanjyot Sawant:	I also getting same error
-01:36:00	Sudeep Bhargava:	code = []for ctr in erupt:    if ctr >= np.median(erupt):        code.append('A')    else:        code.append('B')df['Category']=code
-01:36:28	Sudeep Bhargava:	erupt = df.eruptions
-01:36:58	Sudeep Bhargava:	dfA = df.iloc[np.where(df.Category=='A')[0]]dfB = df.iloc[np.where(df.Category=='B')[0]]
-01:40:43	Sudeep Bhargava:	plt.boxplot([dfA.eruptions,dfB.eruptions])
-01:43:43	Sudeep Bhargava:	sns.boxplot(x='Category',y='eruptions',data=df)
-01:53:13	Sudeep Bhargava:	df = pd.read_excel('Marks.xlsx')sns.boxplot(x='Subject',y='Marks',hue='Trainer', data=df)sns.boxplot(x='Trainer',y='Marks',hue='Subject', data=df)
-02:03:25	Sudeep Bhargava:	df = pd.read_excel('CDAC_DataBook.xlsx',sheet_name='faithful')erupt = df.eruptionscode = []for ctr in erupt:    if ctr >= np.median(erupt):        code.append('A')    else:        code.append('B')df['Category']=code
-02:04:56	Sudeep Bhargava:	# Scatter plot - two variables - Bivariate analysis - both continuousdf = pd.read_excel('CDAC_DataBook.xlsx',sheet_name='faithful')erupt = df.eruptionswait = df.waitingcode = []for ctr in erupt:    if ctr >= np.median(erupt):        code.append('A')    else:        code.append('B')df['Category']=code# Scatter plot using matplotlibplt.scatter(wait,erupt)
-02:05:15	Debmalya Paul:	Reacted to "# Scatter plot - t..." with 👍
-02:05:57	Sudeep Bhargava:	# Scatter plot using seabornsns.scatterplot(y=wait,x=erupt)
-02:10:25	Sudeep Bhargava:	# Scatter plot - three variables - Multivariate analysis - 2 continuous variables + 1 categorical varsns.relplot(x='waiting',y='eruptions',hue='Category',data=df)
-02:11:33	Debmalya Paul:	Happy Dasshera sir
-02:11:37	Sagar Jadhav:	Thank you Sir.

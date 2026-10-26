@@ -1,0 +1,18 @@
+# Only the live site goes to GitHub. Everything else stays local.
+Claude outputs/
+_superseded/
+assets/
+restore-old/
+supabase/
+.vscode/
+ASCEND Staff Attendance.html
+ascendbuildstate.md
+apply.js
+apply-list.js
+assign.js
+assign.css
+list.js
+list.css
+preview-data.js
+preview.ps1
+review.js

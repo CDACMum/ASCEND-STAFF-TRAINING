@@ -1,46 +1,0 @@
-00:44:43	Himanshu Nigam:	48/136
-00:44:46	Aniket Takmare CDAC:	48/136
-00:45:17	Aniket Takmare CDAC:	20/136
-00:45:19	Himanshu Nigam:	20/136
-00:45:43	Himanshu Nigam:	50/136
-00:45:49	Suraj Shankhwar:	95/136
-00:45:50	Aniket Takmare CDAC:	95/136
-00:45:51	Sagar Jadhav:	95/136
-00:47:54	Himanshu Nigam:	41/136
-00:47:55	Aniket Takmare CDAC:	41/136
-00:48:37	Aniket Takmare CDAC:	8/136
-00:48:39	Aniket Jadhav:	8/136
-00:48:43	Himanshu Nigam:	8/136
-00:50:24	Aniket Jadhav:	8/42
-00:50:25	Aniket Takmare CDAC:	8/42
-00:50:26	Trupti Badhekar:	20/136
-00:50:28	Suraj Shankhwar:	8/42
-00:51:32	Trupti Badhekar:	yes sir
-00:52:46	Shilbhushan Khanderao:	38/48
-00:52:47	Himanshu Nigam:	38/48
-00:52:47	Suraj Shankhwar:	38/48
-00:52:47	Aniket Takmare CDAC:	38/48
-00:52:48	Aniket Jadhav:	38/48
-00:52:50	Trupti Badhekar:	38/48
-00:54:24	Suraj Shankhwar:	16/40
-00:55:46	Suraj Shankhwar:	16
-00:56:10	Aniket Takmare CDAC:	16/61
-00:56:24	Abhishek Gade:	57
-00:56:58	Suraj Shankhwar:	yes sir
-00:57:32	Abhishek Gade:	3/57\
-00:57:33	sakshi gaddamwar:	3/57
-00:57:33	Sagar Jadhav:	3/57
-00:58:08	Abhishek Gade:	11/57
-00:58:28	Aniket Takmare CDAC:	0
-01:08:02	Aniket Takmare CDAC:	0.04*0.78
-01:10:17	Suraj Shankhwar:	0.6942
-01:29:32	Sudeep Bhargava:	Three suppliers for a particular raw material – A,B and CA supplies 50% of my requirementsB supplies 30% of my requirementsC supplies 20% of my requirementsIf the product comes from A, the probability of being defective is 3%If the product comes from B, the probability of being defective is 4%If the product comes from C, the probability of being defective is 5%I find a defective product in my assembly. What is the probability that it is coming from A
-01:46:12	Dhiraj Ingale:	1.5%
-01:51:36	Dhiraj Ingale:	yes clear
-01:53:22	Dhiraj Ingale:	0.015 + 0.012 + 0.01
-01:54:29	Rahul Chaudhari:	Independent
-01:55:19	Trupti Badhekar:	mutually exclusive
-01:59:25	Dhiraj Ingale:	P(D) / P(A)
-01:59:31	Aniket Takmare CDAC:	0.015/.037
-01:59:40	Suraj Shankhwar:	0.015/0.37
-02:01:49	Suraj Shankhwar:	sir pls share this diagram in the grp
