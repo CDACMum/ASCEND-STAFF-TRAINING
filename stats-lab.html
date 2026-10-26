@@ -1,0 +1,1228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ASCEND Statistics Lab</title>
+<meta name="description" content="Learn statistics by dragging, scrolling and running code: standard deviation, distributions, Bayes, regression and hypothesis tests.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: a reading column with a sticky chapter rail; every chapter is
+   "explain -> touch it -> run it". Palette is the ASCEND identity (navy, violet, flame). */
+:root{
+  --font-d:"Space Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --font:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,monospace;
+  --bg:#eef2f9; --card:#ffffff; --card-2:#f6f8fd; --ink:#0e1a35; --muted:#55658a; --line:#d9e1f0;
+  --navy:#152a63; --violet:#5a2f9e; --flame:#e4560f; --teal:#0b7a89; --good:#1c8a4f; --warn:#b7791f; --bad:#c62f2f;
+  --code-bg:#0e1a35; --code-ink:#e7ecfa; --out-bg:#f1f4fb; --on-pri:#ffffff;
+  --c-bg:#ffffff; --c-ink:#0e1a35; --c-muted:#6a7a9c; --c-grid:#e3e9f5; --c-point:#2e2b86; --c-mean:#e4560f;
+  --c-median:#0b7a89; --c-sd:#5a2f9e; --c-soft:#c9d3ee; --c-good:#1c8a4f; --c-bad:#c62f2f; --c-warn:#d99a1d;
+  --c-a:#5a2f9e; --c-b:#0b7a89; --c-c:#d99a1d;
+  --pad:max(16px, env(safe-area-inset-left, 0px));
+  --padr:max(16px, env(safe-area-inset-right, 0px));
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#081027; --card:#101c3f; --card-2:#0c1733; --ink:#e7ecfa; --muted:#9db0d8; --line:#22335f;
+    --navy:#8fa6ee; --violet:#b79bff; --flame:#ff8a4c; --teal:#4cc6d6; --good:#4cd08a; --warn:#f0b955; --bad:#ff7a7a;
+    --code-bg:#050b1d; --code-ink:#e7ecfa; --out-bg:#0b1634; --on-pri:#0a1430;
+    --c-bg:#101c3f; --c-ink:#e7ecfa; --c-muted:#8fa0c8; --c-grid:#22335f; --c-point:#aab8ff; --c-mean:#ff8a4c;
+    --c-median:#4cc6d6; --c-sd:#b79bff; --c-soft:#31457f; --c-good:#4cd08a; --c-bad:#ff7a7a; --c-warn:#f0b955;
+    --c-a:#b79bff; --c-b:#4cc6d6; --c-c:#f0b955; color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:76px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 var(--font);-webkit-font-smoothing:antialiased;
+  padding-left:var(--pad);padding-right:var(--padr)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+a{color:var(--violet)}
+h1,h2,h3{font-family:var(--font-d);line-height:1.15;margin:0;text-wrap:balance;letter-spacing:-.01em}
+p{margin:0 0 1em}
+:focus-visible{outline:2.5px solid var(--flame);outline-offset:2px;border-radius:6px}
+button{font:inherit;cursor:pointer}
+code,kbd{font-family:var(--mono);font-size:.9em}
+.wrap{max-width:1180px;margin:0 auto}
+.layout>*,.story>*,.hero>*,.cltgrid>*,.lab,.expert,.prose{min-width:0}
+.cv canvas{width:100%;max-width:100%}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);margin-left:calc(var(--pad)*-1);margin-right:calc(var(--padr)*-1);padding:0 var(--padr) 0 var(--pad)}
+.top .wrap{display:flex;align-items:center;gap:18px;height:56px}
+.brand{font-family:var(--font-d);font-weight:700;letter-spacing:.01em;white-space:nowrap}
+.brand b{color:var(--flame)}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+.chips::-webkit-scrollbar{display:none}
+.chips a{white-space:nowrap;text-decoration:none;color:var(--muted);font-size:13px;font-weight:500;padding:6px 10px;border-radius:99px;border:1px solid transparent}
+.chips a:hover{color:var(--ink);border-color:var(--line)}
+.chips a.on{color:var(--ink);background:var(--card);border-color:var(--line)}
+.bar{position:absolute;left:0;bottom:-1px;height:3px;width:0;background:linear-gradient(90deg,var(--violet),var(--flame))}
+
+/* hero */
+.hero{padding:44px 0 26px;display:grid;grid-template-columns:1.1fr .9fr;gap:32px;align-items:center}
+.eyebrow{font:600 12px/1 var(--font-d);letter-spacing:.14em;text-transform:uppercase;color:var(--flame);margin-bottom:14px}
+.hero h1{font-size:clamp(34px,5.2vw,58px);margin-bottom:16px}
+.hero p.lead{font-size:18px;color:var(--muted);max-width:56ch}
+.hero .how{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.pill{font-size:13px;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 12px;color:var(--ink)}
+.pill b{color:var(--violet)}
+.herocv{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px}
+.herocv canvas{display:block;width:100%}
+@media (max-width:860px){.hero{grid-template-columns:1fr}}
+
+/* chapters */
+.layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:36px}
+.rail{position:sticky;top:76px;align-self:start;font-size:14px;padding-top:6px}
+.rail a{display:block;text-decoration:none;color:var(--muted);padding:6px 0 6px 12px;border-left:2px solid var(--line)}
+.rail a.on{color:var(--ink);border-left-color:var(--flame);font-weight:600}
+.rail a:hover{color:var(--ink)}
+@media (max-width:1000px){.layout{grid-template-columns:1fr}.rail{display:none}}
+section.ch{padding:44px 0 18px;border-top:1px solid var(--line)}
+.ch>header{margin-bottom:20px}
+.ch h2{font-size:clamp(26px,3.6vw,38px);margin-bottom:10px}
+.ch .sub{color:var(--muted);font-size:17px;max-width:62ch}
+.k{font:600 11px/1 var(--font-d);letter-spacing:.14em;text-transform:uppercase;color:var(--violet);margin-bottom:8px;display:block}
+.prose{max-width:68ch}
+.expert{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin:0 0 22px;max-width:76ch}
+.expert .k{color:var(--violet)}
+.expert p:last-child{margin-bottom:0}
+.trap{border:1px dashed var(--flame);border-radius:16px;padding:16px 20px;margin:22px 0;max-width:76ch;background:color-mix(in srgb,var(--flame) 7%,transparent)}
+.trap .k{color:var(--flame)}
+.trap p:last-child{margin:0}
+.eq{font-family:var(--mono);background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:inline-block;margin:4px 0 10px;font-size:15px}
+.check{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 22px;margin:22px 0;max-width:76ch}
+.check details{margin-top:8px}
+.check summary{cursor:pointer;color:var(--violet);font-weight:600}
+
+/* labs */
+.lab{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin:0 0 26px;min-width:0}
+.lab-h{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 16px;align-items:baseline;margin-bottom:12px}
+.lab-h h3{font-size:19px}
+.lab-h span{font-size:13px;color:var(--muted)}
+.cv{position:relative;background:var(--c-bg);border:1px solid var(--line);border-radius:12px;overflow:hidden;touch-action:pan-y}
+.cv canvas{display:block}
+.cv.drag canvas{touch-action:pan-y;cursor:grab}
+.cv.drag.free canvas{touch-action:none}
+.ctrl{display:flex;flex-wrap:wrap;gap:12px 22px;margin-top:14px;align-items:end}
+.ctrl label{display:grid;gap:4px;font-size:13px;color:var(--muted);min-width:150px;flex:1 1 170px}
+.ctrl label span b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.ctrl input[type=range]{width:100%;accent-color:var(--violet)}
+.ctrl select{font:inherit;padding:7px 9px;border-radius:8px;border:1px solid var(--line);background:var(--card-2);color:var(--ink)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{border:1px solid var(--line);background:var(--card-2);color:var(--ink);border-radius:10px;padding:8px 14px;font-weight:600;font-size:14px}
+.btn:hover{border-color:var(--violet)}
+.btn.pri{background:var(--violet);border-color:var(--violet);color:var(--on-pri)}
+.btn.on{border-color:var(--flame);color:var(--flame)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px;margin-top:14px}
+.read div{background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.read small{display:block;font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.read b{font:500 17px var(--mono);overflow-wrap:anywhere}
+.read b.hot{color:var(--flame)}
+.codeline{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.codeline code{background:var(--code-bg);color:var(--code-ink);padding:8px 12px;border-radius:9px;overflow-wrap:anywhere}
+.hint{font-size:13px;color:var(--muted);margin:10px 0 0}
+
+/* sticky story */
+.story{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr);gap:26px;align-items:start;margin-bottom:26px}
+.steps .st{min-height:62vh;display:flex;flex-direction:column;justify-content:center;padding:10px 0;opacity:.45;transition:opacity .3s}
+.steps .st.on{opacity:1}
+.steps .st h3{font-size:22px;margin-bottom:8px}
+.steps .st .num{font:600 12px var(--font-d);letter-spacing:.12em;color:var(--flame);text-transform:uppercase;margin-bottom:6px}
+.stage{position:sticky;top:76px}
+.stage .lab{margin:0}
+@media (max-width:860px){
+  .story{grid-template-columns:1fr}
+  .stage{order:-1;top:56px;z-index:5}
+  .steps .st{min-height:48vh}
+}
+.stepbtn{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.stepbtn .dots{display:flex;gap:5px;margin:0 6px}
+.stepbtn .dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.stepbtn .dots i.on{background:var(--flame)}
+
+/* python cells */
+.py{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card);margin:18px 0;max-width:100%}
+.py-h{display:flex;justify-content:space-between;gap:10px;padding:9px 14px;background:var(--card-2);border-bottom:1px solid var(--line);font-size:13px;font-weight:600}
+.py-h em{font-style:normal;color:var(--muted);font-weight:400}
+.py textarea{display:block;width:100%;border:0;resize:vertical;background:var(--code-bg);color:var(--code-ink);font:13.5px/1.55 var(--mono);padding:14px;min-height:120px;tab-size:4;white-space:pre;overflow:auto}
+.py textarea:focus{outline:2px solid var(--flame);outline-offset:-2px}
+.py-a{display:flex;gap:8px;padding:9px 12px;border-top:1px solid var(--line);align-items:center;flex-wrap:wrap}
+.py-out{margin:0;padding:12px 14px;background:var(--out-bg);border-top:1px solid var(--line);font:13px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:380px;overflow:auto}
+.py-st{font-size:12px;color:var(--muted);margin-left:auto}
+.play textarea{min-height:300px}
+
+footer{padding:40px 0 70px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);margin-top:30px}
+</style>
+</head>
+<body>
+<div class="top"><div class="wrap">
+  <div class="brand">ASCEND <b>Statistics Lab</b></div>
+  <nav class="chips" id="chips" aria-label="Chapters"></nav>
+</div><div class="bar" id="bar"></div></div>
+
+<main class="wrap">
+<div class="hero">
+  <div>
+    <div class="eyebrow">C-DAC Mumbai · Applied AI/ML Engineering</div>
+    <h1>Statistics you can drag, scroll and run.</h1>
+    <p class="lead">Every idea from the October sessions in one place: what it means, why it works, a picture that moves when you touch it, and Python that runs right here in your browser.</p>
+    <div class="how">
+      <span class="pill"><b>Read</b> the expert view</span>
+      <span class="pill"><b>Touch</b> the lab</span>
+      <span class="pill"><b>Run</b> the code</span>
+      <span class="pill"><b>Break</b> it in the playground</span>
+    </div>
+  </div>
+  <div class="herocv"><canvas id="heroCv" aria-label="Animated bell curve with a standard deviation band"></canvas></div>
+</div>
+
+<div class="layout">
+<nav class="rail" id="rail" aria-label="Chapter list"></nav>
+<div>
+
+<!-- 1 -->
+<section class="ch" id="centre" data-title="Centre & outliers">
+  <header><span class="k">Chapter 1</span><h2>Centre and outliers</h2>
+  <p class="sub">What does "typical" mean, and which single number can one bad value ruin?</p></header>
+  <div class="expert"><span class="k">Expert view</span>
+    <p>A summary statistic is a decision about what to ignore. The <b>mean</b> uses every value, so it inherits every outlier: one observation can drag it anywhere, which is why statisticians say its breakdown point is zero. The <b>median</b> uses only the order of the values and survives until half the data is contaminated.</p>
+    <p>The <b>IQR fence rule</b> flags a value when it lies more than 1.5 × IQR beyond the quartiles. It judges a point against the middle half of the data, using quartiles that outliers barely move, so the outlier cannot hide itself by inflating the yardstick.</p>
+  </div>
+  <div class="lab" id="labCentre">
+    <div class="lab-h"><h3>Drag the dots</h3><span>double-click empty space to add a dot · double-click a dot to remove it</span></div>
+    <div class="cv drag"><canvas id="cvCentre"></canvas></div>
+    <div class="btns"><button class="btn" id="cAdd">Add an outlier</button><button class="btn" id="cSkew">Make it skewed</button><button class="btn" id="cReset">Reset</button></div>
+    <div class="read" id="cRead"></div>
+  </div>
+  <div class="trap"><span class="k">Common trap</span><p>Quoting a mean for salaries, delivery times or claim sizes without looking at the shape. When the mean sits well above the median the column is right-skewed: report the median and the IQR, and say so.</p></div>
+  <script type="text/plain" class="pysrc" data-title="Describe a column the way the lab does">import numpy as np
+
+x = np.array([3, 4, 5, 5, 6, 7, 8, 9, 12])
+q1, q3 = np.percentile(x, [25, 75])
+iqr = q3 - q1
+lo, hi = q1 - 1.5*iqr, q3 + 1.5*iqr
+print("mean   :", round(x.mean(), 2))
+print("median :", np.median(x))
+print("Q1, Q3 :", q1, q3, " IQR:", iqr)
+print("fences :", lo, hi)
+print("outliers:", x[(x < lo) | (x > hi)])
+
+x2 = np.append(x, 35)          # add one extreme value
+q1, q3 = np.percentile(x2, [25, 75])
+print("\nafter adding 35 -> mean %.2f, median %.1f" % (x2.mean(), np.median(x2)))
+print("outliers:", x2[(x2 < q1 - 1.5*(q3-q1)) | (x2 > q3 + 1.5*(q3-q1))])</script>
+</section>
+
+<!-- 2 -->
+<section class="ch" id="sd" data-title="Standard deviation">
+  <header><span class="k">Chapter 2</span><h2>Standard deviation, in seven scrolls</h2>
+  <p class="sub">Scroll. Each step adds one idea to the picture on the right. You can drag the dots at any time.</p></header>
+  <div class="story" id="sdStory">
+    <div class="steps" id="sdSteps">
+      <div class="st on"><div class="num">Step 1</div><h3>Start with measurements</h3><p>Eight values on a line. The only question: how <i>spread out</i> are they? Range uses two of the eight values. We want a number that uses all of them.</p></div>
+      <div class="st"><div class="num">Step 2</div><h3>Find the balance point</h3><p>The mean is where the line would balance if every dot had equal weight. It is the natural reference: spread means distance from here.</p></div>
+      <div class="st"><div class="num">Step 3</div><h3>Measure each deviation</h3><p>Each arrow is one deviation, value minus mean. Left of the mean it is negative, right of it positive. Add them up and you always get exactly zero, which is the definition of a balance point, so we cannot average them as they stand.</p></div>
+      <div class="st"><div class="num">Step 4</div><h3>Square each deviation</h3><p>Squaring removes the sign, and it is geometric: a deviation of 4 becomes a square sixteen times the area of a deviation of 1. Far-away points get a loud voice. This is a choice, and the reason standard deviation reacts strongly to outliers.</p></div>
+      <div class="st"><div class="num">Step 5</div><h3>Add the areas</h3><p>The sum of squared deviations (SSD) is the total area of all the squares. It grows with the number of points as well as with the spread, so it cannot be compared across datasets yet.</p></div>
+      <div class="st"><div class="num">Step 6</div><h3>Average the areas: variance</h3><p>Divide the total area by n (population) or n − 1 (sample). The result is the area of the "average square". The unit is the square of your data unit, minutes squared or rupees squared, which nobody can picture.</p>
+        <div class="btns" id="ddofBtns"><button class="btn on" data-d="1">Sample: ÷ (n − 1)</button><button class="btn" data-d="0">Population: ÷ n</button></div></div>
+      <div class="st"><div class="num">Step 7</div><h3>Take the square root: standard deviation</h3><p>The side of the average square is the standard deviation, back in the original unit. Read it as "a typical distance from the mean". For bell-shaped data, about 68% of values fall within one SD of the mean and 95% within two.</p></div>
+    </div>
+    <div class="stage"><div class="lab">
+      <div class="lab-h"><h3>The picture</h3><span id="sdState">step 1 of 7</span></div>
+      <div class="cv drag"><canvas id="cvSd"></canvas></div>
+      <div class="stepbtn"><button class="btn" id="sdPrev" aria-label="Previous step">◀</button><div class="dots" id="sdDots"></div><button class="btn" id="sdNext" aria-label="Next step">▶</button></div>
+      <div class="read" id="sdRead"></div>
+    </div></div>
+  </div>
+  <div class="expert"><span class="k">Expert view</span>
+    <p>The standard deviation is the root-mean-square distance from the mean. Because the sample mean is computed from the same data, deviations from it are systematically smaller than deviations from the true, unknown mean. Dividing by n − 1 (Bessel's correction) removes that bias in the <i>variance</i>. The sample SD itself is still slightly biased low, which is acceptable.</p>
+  </div>
+  <div class="lab" id="labDdof">
+    <div class="lab-h"><h3>Why n − 1? Watch it happen</h3><span>population: mean 50, SD 10, true variance 100</span></div>
+    <div class="cv"><canvas id="cvDdof"></canvas></div>
+    <div class="ctrl" id="ddofCtrl"></div>
+    <div class="btns"><button class="btn pri" id="dd1">Draw 1 sample</button><button class="btn pri" id="dd1000">Draw 1,000 samples</button><button class="btn" id="ddReset">Reset</button></div>
+    <div class="read" id="ddRead"></div>
+    <p class="hint">Each sample's variance is computed twice: dividing by n (orange) and by n − 1 (violet). Averaged over many samples, only n − 1 lands on 100. The dividing-by-n estimate settles at 100 × (n − 1)/n, and the gap is largest for small samples.</p>
+  </div>
+  <script type="text/plain" class="pysrc" data-title="SD by hand, then by NumPy (the 8 values in the picture)">import numpy as np
+
+x = np.array([2, 4, 4, 4, 5, 5, 7, 9])
+mean = x.mean()
+dev = x - mean
+print("mean       :", mean)
+print("deviations :", dev, " sum =", dev.sum())
+print("squares    :", dev**2, " SSD =", (dev**2).sum())
+n = len(x)
+print("population variance = SSD/n     =", (dev**2).sum()/n, "  np.var(x)         =", np.var(x))
+print("sample variance     = SSD/(n-1) = %.4f   np.var(x, ddof=1) = %.4f" % ((dev**2).sum()/(n-1), np.var(x, ddof=1)))
+print("population SD =", np.std(x), "   sample SD = %.4f" % np.std(x, ddof=1))
+within = ((x > mean - np.std(x, ddof=1)) & (x < mean + np.std(x, ddof=1))).sum()
+print("values within one sample SD of the mean:", within, "of", n)</script>
+  <div class="trap"><span class="k">Common trap</span><p>Using <code>np.var(x)</code> or <code>np.std(x)</code> on a sample and assuming it is the sample statistic. NumPy divides by n unless you pass <code>ddof=1</code>; pandas' <code>.std()</code> divides by n − 1 by default. Know which one you called.</p></div>
+</section>
+
+<!-- 3 -->
+<section class="ch" id="shape" data-title="Shape">
+  <header><span class="k">Chapter 3</span><h2>Shape: skewness and kurtosis</h2>
+  <p class="sub">Two columns can share a mean and an SD and still behave very differently.</p></header>
+  <div class="expert"><span class="k">Expert view</span>
+    <p><b>Skewness</b> is the third standardised moment: it measures asymmetry. A positive value means a long right tail (salaries, claim sizes), and the mean is pulled above the median. A negative value means a long left tail. The name follows the tail, not the peak.</p>
+    <p><b>Excess kurtosis</b> (the scipy and pandas convention) is the fourth standardised moment minus 3, so the normal curve scores 0. Positive means heavier tails and a sharper peak than normal: more surprises. Negative means lighter tails. For risk, kurtosis is the number that says how often extremes occur.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><h3>Skewness: slide the peak</h3><span>the curve is a Beta distribution</span></div>
+    <div class="cv"><canvas id="cvSkew"></canvas></div>
+    <div class="ctrl" id="skewCtrl"></div>
+    <div class="read" id="skewRead"></div>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><h3>Kurtosis: fatter tails</h3><span>Student t with unit variance, against the normal curve</span></div>
+    <div class="cv"><canvas id="cvKurt"></canvas></div>
+    <div class="ctrl" id="kurtCtrl"></div>
+    <div class="read" id="kurtRead"></div>
+  </div>
+  <script type="text/plain" class="pysrc" data-title="Skewness and kurtosis of three shapes">import numpy as np
+from scipy import stats
+
+right  = np.repeat([1,2,3,4,5,6,7,8,9,10], [5,10,150,140,120,100,80,60,40,20])
+left   = np.repeat([1,2,3,4,5,6,7,8,9,10], [20,40,60,80,100,120,140,150,10,5])
+sharp  = np.repeat([1,2,3,4,5,6,7,8,9,10], [5,10,15,20,400,20,15,10,5,2])
+for name, x in [("right-skewed", right), ("left-skewed", left), ("sharp peak", sharp)]:
+    print("%-13s skew = %6.3f  excess kurtosis = %6.3f  mean = %.2f  median = %.1f" %
+          (name, stats.skew(x), stats.kurtosis(x), x.mean(), np.median(x)))</script>
+</section>
+
+<!-- 4 -->
+<section class="ch" id="normal" data-title="Normal curve">
+  <header><span class="k">Chapter 4</span><h2>The normal curve and z-scores</h2>
+  <p class="sub">Bangalore to Mumbai: mean 15 hours, SD 2 hours. How likely is a drive under 14?</p></header>
+  <div class="expert"><span class="k">Expert view</span>
+    <p>A normal curve is fully described by two numbers. A <b>z-score</b>, <span class="eq" style="margin:0;padding:2px 8px">z = (x − μ) / σ</span>, counts how many standard deviations a value sits from the mean, which turns every normal problem into one standard problem. <code>cdf</code> answers "how much probability lies to the left of x"; <code>ppf</code> is its inverse, "which x has this much to its left".</p>
+    <p>Everything you meet later (confidence intervals, p-values, control limits) is a probability under this curve or a close relative of it.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><h3>Drag the red line</h3><span>or drag across the curve to move the shaded boundary</span></div>
+    <div class="tabs" id="nTabs"></div>
+    <div class="cv drag"><canvas id="cvNormal"></canvas></div>
+    <div class="ctrl" id="nCtrl"></div>
+    <div class="btns"><button class="btn pri" id="nRule">Animate the 68–95–99.7 rule</button></div>
+    <div class="read" id="nRead"></div>
+    <div class="codeline"><code id="nCode"></code><button class="btn" id="nRun">Run this in Python</button></div>
+  </div>
+  <script type="text/plain" class="pysrc" data-title="The class questions, with scipy">from scipy.stats import norm
+
+mean, sd = 15, 2
+print("P(T < 14)          = %.4f" % norm.cdf(14, mean, sd))
+print("P(T > 14)          = %.4f" % norm.sf(14, mean, sd))
+print("P(13.5 < T < 16.2) = %.4f" % (norm.cdf(16.2, mean, sd) - norm.cdf(13.5, mean, sd)))
+z = (14 - mean) / sd
+print("z for 14 hours     = %.2f  -> norm.cdf(z) = %.4f" % (z, norm.cdf(z)))
+print("90%% of trips finish within %.2f hours" % norm.ppf(0.90, mean, sd))
+print("LED bulbs (500 h, SD 150): guarantee for 90%% survival = %.1f h" % norm.ppf(0.10, 500, 150))
+print("rule check:", [round(norm.cdf(k) - norm.cdf(-k), 4) for k in (1, 2, 3)])</script>
+</section>
+
+<!-- 5 -->
+<section class="ch" id="clt" data-title="Central limit theorem">
+  <header><span class="k">Chapter 5</span><h2>Why averages behave: the central limit theorem</h2>
+  <p class="sub">Start from a lopsided population. Average samples of it. Watch a bell appear.</p></header>
+  <div class="expert"><span class="k">Expert view</span>
+    <p>If you repeatedly draw samples of size n from <i>any</i> population with a finite variance, the distribution of the sample <b>means</b> approaches a normal curve centred on the population mean, with spread σ/√n (the standard error). The population does not have to be normal; n only has to be large enough, and heavier skew needs a larger n.</p>
+    <p>This is the licence behind z-tests, t-tests and confidence intervals on averages. It also explains the "n ≥ 30" rule of thumb taught in class: not magic, just usually enough for moderate skew.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><h3>Drop sample means</h3><span>left: the population · right: the means you collect</span></div>
+    <div class="tabs" id="cltTabs"></div>
+    <div class="cltgrid" style="display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr);gap:10px">
+      <div class="cv"><canvas id="cvPop"></canvas></div><div class="cv"><canvas id="cvMeans"></canvas></div>
+    </div>
+    <div class="ctrl" id="cltCtrl"></div>
+    <div class="btns"><button class="btn pri" id="cl1">Drop 1 mean</button><button class="btn pri" id="cl200">Drop 500 means</button><button class="btn" id="clReset">Clear</button></div>
+    <div class="read" id="clRead"></div>
+  </div>
+  <script type="text/plain" class="pysrc" data-title="Simulate it: means of 30 draws from a skewed population">import numpy as np
+from scipy import stats
+
+rng = np.random.default_rng(1)
+pop = rng.exponential(scale=1.0, size=100000)            # strongly right-skewed
+print("population: mean %.3f  SD %.3f  skew %.2f" % (pop.mean(), pop.std(), stats.skew(pop)))
+for n in (2, 5, 30, 200):
+    means = rng.choice(pop, size=(5000, n)).mean(axis=1)
+    print("n = %3d  mean of means %.3f   SD of means %.3f (theory %.3f)   skew of means %.2f" %
+          (n, means.mean(), means.std(), pop.std()/np.sqrt(n), stats.skew(means)))</script>
+</section>
+
+<!-- 6 -->
+<section class="ch" id="dist" data-title="Distributions">
+  <header><span class="k">Chapter 6</span><h2>Distributions you can query</h2>
+  <p class="sub">Binomial, Poisson, exponential and Student's t, with the scipy call written for you.</p></header>
+  <div class="expert"><span class="k">Expert view</span>
+    <p>Choose the distribution from the <i>story</i>, not the data. <b>Binomial</b>: a fixed number of independent yes/no trials with known p. <b>Poisson</b>: events counted in a window when you know the average rate. <b>Exponential</b>: the waiting time between those Poisson events. <b>t</b>: a bell with heavier tails, used for means when σ is estimated from a small sample.</p>
+    <p>Then translate the English: <i>exactly k</i> is <code>pmf</code>; <i>at most k</i> is <code>cdf</code>; <i>at least k</i> is <code>sf(k − 1)</code> for counts; <i>between a and b inclusive</i> is <code>cdf(b) − cdf(a − 1)</code>.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><h3>Distribution explorer</h3><span>shaded = the probability you asked for</span></div>
+    <div class="tabs" id="dTabs"></div>
+    <div class="cv"><canvas id="cvDist"></canvas></div>
+    <div class="ctrl" id="dCtrl"></div>
+    <div class="read" id="dRead"></div>
+    <div class="codeline"><code id="dCode"></code><button class="btn" id="dRun">Run this in Python</button></div>
+    <p class="hint" id="dHint"></p>
+  </div>
+  <div class="trap"><span class="k">Common trap</span><p><code>expon.cdf(7, 365/70)</code> does not use 365/70 as the mean. After x, scipy's next positional argument is <code>loc</code>, a shift. The mean goes in <code>scale</code>: <code>expon.cdf(7, scale=365/70)</code> gives 0.739; the shifted version gives 0.832. Try it in the explorer above (Exponential tab, mean gap 5.21, x = 7).</p></div>
+  <script type="text/plain" class="pysrc" data-title="The class problems, all four families">from scipy.stats import binom, poisson, expon, t, norm
+
+print("Binomial  exactly 12 of 15 (p=.8)   :", round(binom.pmf(12, 15, 0.8), 4))
+print("Binomial  at least 12               :", round(binom.sf(11, 15, 0.8), 4))
+print("Poisson   exactly 35 (mean 40)      :", round(poisson.pmf(35, 40), 4))
+print("Poisson   between 34 and 39         :", round(poisson.cdf(39, 40) - poisson.cdf(33, 40), 4))
+mtbf = 365 / 70
+print("Exponential  breakdown within 7 days:", round(expon.cdf(7, scale=mtbf), 4))
+print("Exponential  days for 99% chance    :", round(expon.ppf(0.99, scale=mtbf), 2))
+z = (14 - 15) / 2
+print("t (n=20) P(T<14) :", round(t.cdf(z, 19), 4), "  normal:", round(norm.cdf(z), 4))</script>
+</section>
+
+<!-- 7 -->
+<section class="ch" id="bayes" data-title="Probability & Bayes">
+  <header><span class="k">Chapter 7</span><h2>Probability and Bayes, with 1,000 people</h2>
+  <p class="sub">Percentages mislead. Counts of people do not.</p></header>
+  <div class="expert"><span class="k">Expert view</span>
+    <p>Bayes' theorem updates a prior with evidence: <span class="eq" style="margin:0;padding:2px 8px">P(A | E) = P(E | A) · P(A) / P(E)</span>. In practice, skip the formula: imagine 1,000 cases, count how many land in each branch, and divide the ones you care about by <i>all</i> the ones that show the evidence.</p>
+    <p>The classic error is confusing P(E | A) with P(A | E): "95% of sick people test positive" is not "95% of positives are sick". When the condition is rare, most positives come from the large healthy group.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><h3>Every dot is a person</h3><span>colour shows what happened to them</span></div>
+    <div class="tabs" id="bTabs"></div>
+    <div class="cv"><canvas id="cvBayes"></canvas></div>
+    <div class="ctrl" id="bCtrl"></div>
+    <div class="read" id="bRead"></div>
+    <p class="hint" id="bHint"></p>
+  </div>
+  <script type="text/plain" class="pysrc" data-title="Supplier problem and screening test, both ways">import numpy as np
+
+# supplier problem from class
+share  = np.array([0.50, 0.30, 0.20])
+defect = np.array([0.03, 0.04, 0.05])
+joint  = share * defect
+print("P(defective)  =", joint.sum())
+print("P(A|defective), P(B|..), P(C|..) =", (joint / joint.sum()).round(4))
+
+# screening test
+prev, sens, fpr = 0.01, 0.95, 0.05
+tp, fp = prev*sens, (1-prev)*fpr
+print("\nP(disease | positive) = %.3f" % (tp / (tp + fp)))
+
+# simulate it to check
+rng = np.random.default_rng(0)
+sick = rng.random(1_000_000) < prev
+pos = np.where(sick, rng.random(1_000_000) < sens, rng.random(1_000_000) < fpr)
+print("simulated             = %.3f" % sick[pos].mean())</script>
+</section>
+
+<!-- 8 -->
+<section class="ch" id="corr" data-title="Correlation & regression">
+  <header><span class="k">Chapter 8</span><h2>Correlation and regression</h2>
+  <p class="sub">One number is never the whole picture. Anscombe made the point with four tiny datasets.</p></header>
+  <div class="expert"><span class="k">Expert view</span>
+    <p>Pearson's <b>r</b> measures the strength of a <i>straight-line</i> relationship, from −1 to +1. Least-squares regression chooses the line that minimises the sum of squared vertical residuals; <b>R²</b> is the share of the variance in y that the line accounts for (for one predictor, R² = r²).</p>
+    <p>Both are sensitive to single points. Drag one dot far from the rest and watch the slope and r move. Then press the Anscombe buttons: four datasets with the same mean, variance, r, slope and intercept, and four completely different stories. Always plot before you trust a coefficient.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><h3>Drag the points</h3><span>the line refits every frame</span></div>
+    <div class="cv drag free"><canvas id="cvCorr"></canvas></div>
+    <div class="btns" id="corrBtns"></div>
+    <div class="read" id="corrRead"></div>
+    <div class="codeline"><button class="btn" id="corrRun">Send these points to Python</button></div>
+  </div>
+  <script type="text/plain" class="pysrc" data-title="Fit a line and read r, R², slope">import numpy as np
+from scipy.stats import pearsonr
+from sklearn.linear_model import LinearRegression
+
+x = np.array([10, 8, 13, 9, 11, 14, 6, 4, 12, 7, 5])             # Anscombe I
+y = np.array([8.04, 6.95, 7.58, 8.81, 8.33, 9.96, 7.24, 4.26, 10.84, 4.82, 5.68])
+r, p = pearsonr(x, y)
+m = LinearRegression().fit(x.reshape(-1, 1), y)
+print("r = %.3f   R2 = %.3f   p = %.4f" % (r, m.score(x.reshape(-1, 1), y), p))
+print("y = %.2f + %.3f x" % (m.intercept_, m.coef_[0]))</script>
+</section>
+
+<!-- 9 -->
+<section class="ch" id="test" data-title="Testing a claim">
+  <header><span class="k">Chapter 9</span><h2>Testing a claim: what a p-value really is</h2>
+  <p class="sub">Run the same experiment a thousand times and see how often "significant" happens.</p></header>
+  <div class="expert"><span class="k">Expert view</span>
+    <p>A <b>p-value</b> is the probability of seeing a difference at least this large <i>if the null hypothesis were true</i>. It is not the probability that the null is true. If there is truly no difference and you test at 0.05, you will still declare a difference in about 1 experiment in 20: that is the Type I error rate, and it is the 5% you chose.</p>
+    <p>When a real difference exists, the share of experiments with p &lt; 0.05 is the <b>power</b>. It rises with the true difference and with n, and falls with noise. A small, noisy study can have power so low that a "significant" result is more likely an inflated fluke than a discovery.</p>
+  </div>
+  <div class="lab">
+    <div class="lab-h"><h3>Two groups, many experiments</h3><span>Welch two-sample t-test, two-sided</span></div>
+    <div class="cv"><canvas id="cvTest"></canvas></div>
+    <div class="ctrl" id="tCtrl"></div>
+    <div class="btns"><button class="btn pri" id="t1">Run 1 experiment</button><button class="btn pri" id="t1000">Run 1,000 experiments</button><button class="btn" id="tReset">Clear</button></div>
+    <div class="read" id="tRead"></div>
+    <p class="hint" id="tHint">Set the true difference to 0 and run 1,000: about 5% will still be "significant". That is not a bug.</p>
+  </div>
+  <script type="text/plain" class="pysrc" data-title="One real t-test, then 2,000 repeats under the null">import numpy as np
+from scipy.stats import ttest_ind
+
+rng = np.random.default_rng(3)
+a = rng.normal(100, 10, 30); b = rng.normal(105, 10, 30)
+t_, p = ttest_ind(a, b, equal_var=False)
+print("one experiment: diff = %.2f  t = %.2f  p = %.4f" % (b.mean() - a.mean(), t_, p))
+
+ps = [ttest_ind(rng.normal(100, 10, 30), rng.normal(100, 10, 30), equal_var=False)[1] for _ in range(2000)]
+print("true difference = 0 -> share with p < 0.05:", np.mean(np.array(ps) < 0.05))</script>
+</section>
+
+<!-- 10 -->
+<section class="ch" id="play" data-title="Playground">
+  <header><span class="k">Chapter 10</span><h2>Playground</h2>
+  <p class="sub">A blank Python notebook cell. NumPy, pandas, SciPy and scikit-learn load on demand. Press Ctrl+Enter to run.</p></header>
+  <div class="py play" id="playCell">
+    <div class="py-h"><span>Python · runs in your browser</span><em><select id="exSel" aria-label="Load an example"></select></em></div>
+    <textarea id="playTa" spellcheck="false" aria-label="Python code"></textarea>
+    <div class="py-a"><button class="btn pri" id="playRun">▶ Run</button><button class="btn" id="playClear">Clear output</button><span class="py-st" id="playSt">Python loads on first run (about 10 MB, 15–25 s)</span></div>
+    <pre class="py-out" id="playOut" hidden></pre>
+  </div>
+  <div class="check"><span class="k">Check yourself</span>
+    <p>A column has mean 52, median 38, SD 40. Is it symmetric? Which pair of numbers would you report, and which chart would you draw first?</p>
+    <details><summary>Show the answer</summary><p>Mean well above the median points to a long right tail, so it is right-skewed (the SD of 40 against a mean of 52 hints at the same). Report the median and the IQR, and draw a histogram and a box plot before computing anything else. Check the high values for genuine outliers with the 1.5 × IQR fences, and decide how to treat them before modelling.</p></details>
+  </div>
+</section>
+
+<footer>Built from the October sessions of ASCEND 2026 · C-DAC Mumbai. Labs run in your browser; Python runs through Pyodide. Simulations use simulated data, not the course workbook.</footer>
+</div>
+</div>
+</main>
+<script>
+(function(){
+'use strict';
+/* ---------- helpers ---------- */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const fmt=(x,d=2)=>(Number.isFinite(x)?x:NaN).toFixed(d);
+const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const C={};
+function readColors(){const cs=getComputedStyle(document.documentElement);
+  ['bg','ink','muted','grid','point','mean','median','sd','soft','good','bad','warn','a','b','c'].forEach(k=>C[k]=cs.getPropertyValue('--c-'+k).trim());}
+readColors();
+
+/* ---------- math (checked against scipy in the test run) ---------- */
+const M={};
+M.erf=function(x){const s=Math.sign(x);x=Math.abs(x);const t=1/(1+0.3275911*x);
+  const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return s*y;};
+M.normCdf=(x,m=0,s=1)=>0.5*(1+M.erf((x-m)/(s*Math.SQRT2)));
+M.normPdf=(x,m=0,s=1)=>Math.exp(-0.5*((x-m)/s)**2)/(s*Math.sqrt(2*Math.PI));
+M.normInv=function(p){
+  if(p<=0)return -Infinity; if(p>=1)return Infinity;
+  const a=[-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00];
+  const b=[-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01];
+  const c=[-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00];
+  const d=[7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
+  const pl=0.02425,ph=1-pl;let q,r,x;
+  if(p<pl){q=Math.sqrt(-2*Math.log(p));x=(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  else if(p<=ph){q=p-0.5;r=q*q;x=(((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);}
+  else{q=Math.sqrt(-2*Math.log(1-p));x=-(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  const e=M.normCdf(x)-p,u=e*Math.sqrt(2*Math.PI)*Math.exp(x*x/2);return x-u/(1+x*u/2);};
+M.lgamma=function(z){const g=7,c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(z<0.5)return Math.log(Math.PI/Math.abs(Math.sin(Math.PI*z)))-M.lgamma(1-z);
+  z-=1;let x=c[0];for(let i=1;i<g+2;i++)x+=c[i]/(z+i);const t=z+g+0.5;return 0.5*Math.log(2*Math.PI)+(z+0.5)*Math.log(t)-t+Math.log(x);};
+M.binomPmf=(k,n,p)=>{if(k<0||k>n)return 0;if(p<=0)return k===0?1:0;if(p>=1)return k===n?1:0;
+  return Math.exp(M.lgamma(n+1)-M.lgamma(k+1)-M.lgamma(n-k+1)+k*Math.log(p)+(n-k)*Math.log(1-p));};
+M.poisPmf=(k,mu)=>k<0?0:Math.exp(k*Math.log(mu)-mu-M.lgamma(k+1));
+M.exponCdf=(x,scale)=>x<=0?0:1-Math.exp(-x/scale);
+M.exponPdf=(x,scale)=>x<0?0:Math.exp(-x/scale)/scale;
+M.tPdf=(x,df)=>Math.exp(M.lgamma((df+1)/2)-M.lgamma(df/2))/Math.sqrt(df*Math.PI)*Math.pow(1+x*x/df,-(df+1)/2);
+M.betacf=function(a,b,x){const FP=1e-300;const qab=a+b,qap=a+1,qam=a-1;let c=1,d=1-qab*x/qap;if(Math.abs(d)<FP)d=FP;d=1/d;let h=d;
+  for(let m=1;m<=200;m++){const m2=2*m;let aa=m*(b-m)*x/((qam+m2)*(a+m2));d=1+aa*d;if(Math.abs(d)<FP)d=FP;c=1+aa/c;if(Math.abs(c)<FP)c=FP;d=1/d;h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));d=1+aa*d;if(Math.abs(d)<FP)d=FP;c=1+aa/c;if(Math.abs(c)<FP)c=FP;d=1/d;const del=d*c;h*=del;if(Math.abs(del-1)<3e-12)break;}
+  return h;};
+M.ibeta=function(a,b,x){if(x<=0)return 0;if(x>=1)return 1;
+  const bt=Math.exp(M.lgamma(a+b)-M.lgamma(a)-M.lgamma(b)+a*Math.log(x)+b*Math.log(1-x));
+  return x<(a+1)/(a+b+2)?bt*M.betacf(a,b,x)/a:1-bt*M.betacf(b,a,1-x)/b;};
+M.tCdf=(t,df)=>{const x=df/(df+t*t);const p=0.5*M.ibeta(df/2,0.5,x);return t>0?1-p:p;};
+M.betaPdf=(x,a,b)=>x<=0||x>=1?0:Math.exp(M.lgamma(a+b)-M.lgamma(a)-M.lgamma(b)+(a-1)*Math.log(x)+(b-1)*Math.log(1-x));
+M.mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+M.sd=(a,dd=1)=>{const m=M.mean(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/(a.length-dd));};
+M.pct=(a,p)=>{const s=[...a].sort((x,y)=>x-y);const i=(s.length-1)*p/100,lo=Math.floor(i),hi=Math.ceil(i);return s[lo]+(s[hi]-s[lo])*(i-lo);};
+M.median=a=>M.pct(a,50);
+function seeded(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let R=seeded(20261024);
+const rand=()=>R();
+function randn(){let u=0;while(u===0)u=rand();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rand());}
+window.__M=M; // exposed for the test run
+
+/* ---------- canvas engine ---------- */
+const canvases=[],tickers=[];let raf=0;
+function kick(){if(!raf)raf=requestAnimationFrame(frame);}
+function frame(t){raf=0;let again=false;
+  for(const f of tickers){if(f(t))again=true;}
+  for(const o of canvases){if(o.dirty&&o.visible){o.dirty=false;o.ctx.clearRect(0,0,o.w,o.h);try{o.draw(o.ctx,o.w,o.h,t);}catch(err){console.error(err);}}}
+  if(again||canvases.some(o=>o.dirty&&o.visible))kick();}
+const io=new IntersectionObserver(es=>{es.forEach(e=>{const o=e.target.__o;if(o){o.visible=e.isIntersecting;if(o.visible){o.dirty=true;kick();}}});},{rootMargin:'120px'});
+function canvas(el,ratio,draw,opt={}){
+  const o={el,ctx:el.getContext('2d'),w:300,h:200,draw,dirty:true,visible:false,ratio,minH:opt.minH||0};
+  el.__o=o;
+  o.fit=function(){const host=el.parentElement,r=host.getBoundingClientRect();const w=Math.max(240,Math.floor(r.width));
+    const h=Math.max(o.minH,Math.round(w*(typeof o.ratio==='function'?o.ratio(w):o.ratio)));const d=Math.min(2,window.devicePixelRatio||1);
+    el.width=Math.round(w*d);el.height=Math.round(h*d);el.style.width='100%';el.style.height=h+'px';o.ctx.setTransform(d,0,0,d,0,0);o.w=w;o.h=h;o.dirty=true;kick();};
+  new ResizeObserver(()=>o.fit()).observe(el.parentElement);o.fit();io.observe(el);
+  o.redraw=()=>{o.dirty=true;kick();};canvases.push(o);return o;}
+function pxy(e,el){const r=el.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top];}
+function drag(o,h){const el=o.el;let id=null;
+  el.addEventListener('pointerdown',e=>{const[x,y]=pxy(e,el);const k=h.hit(x,y);if(k!=null){id=k;try{el.setPointerCapture(e.pointerId);}catch(_){}e.preventDefault();el.style.cursor='grabbing';h.start&&h.start(k,x,y);}});
+  el.addEventListener('pointermove',e=>{const[x,y]=pxy(e,el);if(id!=null)h.move(id,x,y);else el.style.cursor=h.hit(x,y)!=null?'grab':'default';});
+  const up=()=>{if(id!=null){id=null;el.style.cursor='default';h.end&&h.end();}};
+  el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
+  el.addEventListener('dblclick',e=>{const[x,y]=pxy(e,el);h.dbl&&h.dbl(x,y,h.hit(x,y));});}
+function T(ctx,s,x,y,o={}){ctx.font=`${o.w||400} ${o.s||12}px ${o.m?'JetBrains Mono, ui-monospace, monospace':'Inter, system-ui, sans-serif'}`;
+  ctx.fillStyle=o.c||C.ink;ctx.textAlign=o.a||'center';ctx.textBaseline=o.b||'alphabetic';ctx.fillText(s,x,y);}
+function axisX(ctx,x0,x1,y,v0,v1,step,o={}){ctx.strokeStyle=C.muted;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();
+  for(let v=Math.ceil(v0/step)*step;v<=v1+1e-9;v+=step){const x=x0+(v-v0)/(v1-v0)*(x1-x0);ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+4);ctx.stroke();
+    T(ctx,(o.f?o.f(v):String(Math.round(v*100)/100)),x,y+16,{c:C.muted,s:11});}}
+function circle(ctx,x,y,r,fill,stroke,lw=1){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke();}}
+function alpha(col,a){ // css colour + alpha, works for #rgb/#rrggbb
+  if(col[0]==='#'){let h=col.slice(1);if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;}return col;}
+function setRead(el,items){el.innerHTML=items.map(([k,v,hot])=>`<div><small>${k}</small><b${hot?' class="hot"':''}>${v}</b></div>`).join('');}
+function slider(host,id,label,min,max,step,val,fmtf,on){
+  const l=document.createElement('label');l.innerHTML=`<span>${label} <b id="${id}V"></b></span><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}">`;
+  host.appendChild(l);const inp=l.querySelector('input'),out=l.querySelector('b');
+  const upd=()=>{out.textContent=fmtf?fmtf(+inp.value):inp.value;};upd();
+  inp.addEventListener('input',()=>{upd();on(+inp.value);});
+  inp.set=v=>{inp.value=v;upd();};inp.hide=h=>{l.hidden=h;};return inp;}
+function select(host,id,label,opts,val,on){
+  const l=document.createElement('label');l.innerHTML=`<span>${label}</span><select id="${id}">${opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}</select>`;
+  host.appendChild(l);const s=l.querySelector('select');s.value=val;s.addEventListener('change',()=>on(s.value));s.hide=h=>{l.hidden=h;};return s;}
+function tabs(host,items,cur,on){host.innerHTML='';const bs=items.map(([k,t])=>{const b=document.createElement('button');b.className='btn'+(k===cur?' on':'');b.textContent=t;
+  b.addEventListener('click',()=>{bs.forEach(x=>x.classList.remove('on'));b.classList.add('on');on(k);});host.appendChild(b);return b;});}
+
+/* ---------- Python (Pyodide) ---------- */
+function loadScriptOnce(src){return new Promise((res,rej)=>{if(window.loadPyodide)return res();const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('script blocked or offline'));document.head.appendChild(s);});}
+const Py={_p:null,_l:null,
+  async get(on){if(this._p)return this._p;if(this._l)return this._l;
+    this._l=(async()=>{on&&on('Loading Python (first run downloads about 10 MB)…');
+      await loadScriptOnce('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
+      const p=await window.loadPyodide({indexURL:'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'});
+      on&&on('Loading numpy and pandas…');await p.loadPackage(['numpy','pandas']);this._p=p;return p;})();
+    this._l.catch(()=>{this._l=null;});return this._l;}};
+async function runPy(code,out,st){
+  out.hidden=false;out.textContent='…';let p;
+  try{p=await Py.get(m=>{st.textContent=m;});}catch(e){out.textContent='Could not load the Python engine. It needs an internet connection and access to cdn.jsdelivr.net.\n'+(e.message||'');st.textContent='Error';return;}
+  try{if(/\b(from|import)\s+(scipy|sklearn|statsmodels|matplotlib)\b/.test(code)){st.textContent='Loading libraries used by this code…';await p.loadPackagesFromImports(code);}}catch(_){}
+  st.textContent='Running…';
+  try{p.globals.set('_src',code);
+    const o=await p.runPythonAsync(`
+import sys, io
+_b = io.StringIO(); _o = sys.stdout; sys.stdout = _b
+try:
+    exec(_src, {})
+except Exception:
+    import traceback; traceback.print_exc()
+finally:
+    sys.stdout = _o
+_b.getvalue()`);
+    out.textContent=(o&&String(o).trim())?o:'(ran with no printed output; add print(...) to see values)';st.textContent='Done';
+  }catch(e){out.textContent=String(e.message||e);st.textContent='Error';}}
+function pyCell(src,title){
+  const d=document.createElement('div');d.className='py';
+  d.innerHTML=`<div class="py-h"><span>▶ ${title}</span><em>editable · Ctrl+Enter runs</em></div><textarea spellcheck="false" aria-label="Python code"></textarea>
+  <div class="py-a"><button class="btn pri">▶ Run</button><button class="btn">Reset</button><span class="py-st"></span></div><pre class="py-out" hidden></pre>`;
+  const ta=$('textarea',d),[run,reset]=$$('button',d),st=$('.py-st',d),out=$('.py-out',d);
+  ta.value=src;const grow=()=>{ta.style.height='auto';ta.style.height=Math.min(560,ta.scrollHeight+4)+'px';};grow();ta.addEventListener('input',grow);
+  const go=()=>runPy(ta.value,out,st);run.addEventListener('click',go);
+  ta.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();go();}
+    if(e.key==='Tab'){e.preventDefault();const s=ta.selectionStart;ta.setRangeText('    ',s,ta.selectionEnd,'end');}});
+  reset.addEventListener('click',()=>{ta.value=src;grow();out.hidden=true;st.textContent='';});
+  d.grow=grow;d.setCode=(c,runNow)=>{ta.value=c;grow();if(runNow)go();};return d;}
+$$('script.pysrc').forEach(s=>{const c=pyCell(s.textContent.replace(/^\n/,''),s.dataset.title||'Run it');s.after(c);s.cell=c;c.grow();});
+addEventListener('load',()=>$$('.py').forEach(d=>d.grow&&d.grow()));
+  addEventListener('load',()=>{try{const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){io.disconnect();Py.get(()=>{}).catch(()=>{});}},{rootMargin:'900px'});$$('.py').forEach(d=>io.observe(d));}catch(_){}});
+const cellOf=n=>$$('script.pysrc')[n].cell;
+function toPlayground(code){const ta=$('#playTa');ta.value=code;$('#playCell').scrollIntoView({behavior:REDUCED?'auto':'smooth',block:'center'});$('#playRun').click();}
+
+/* ---------- navigation ---------- */
+const secs=$$('section.ch');
+$('#chips').innerHTML=secs.map(s=>`<a href="#${s.id}">${s.dataset.title}</a>`).join('');
+$('#rail').innerHTML=secs.map(s=>`<a href="#${s.id}">${s.dataset.title}</a>`).join('');
+function spy(){const y=window.scrollY+130;let cur=secs[0];secs.forEach(s=>{if(s.offsetTop<=y)cur=s;});
+  $$('#chips a,#rail a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+cur.id));
+  const on=$('#chips a.on');if(on&&on.scrollIntoView&&!spy.lock){const c=$('#chips');c.scrollTo({left:on.offsetLeft-c.clientWidth/2+on.clientWidth/2});}
+  const h=document.documentElement.scrollHeight-innerHeight;$('#bar').style.width=(h>0?clamp(scrollY/h,0,1)*100:0)+'%';}
+let sp=0;addEventListener('scroll',()=>{if(!sp)sp=requestAnimationFrame(()=>{sp=0;spy();});},{passive:true});spy();
+
+/* ---------- hero ---------- */
+const hero=canvas($('#heroCv'),0.62,(ctx,w,h,t)=>{
+  const s=1+0.35*Math.sin((t||0)/1400)*(REDUCED?0:1);const mid=w/2,base=h-34,sc=w/9,top=h-70;
+  const pdf=x=>M.normPdf(x,0,1);const y=x=>base-(M.normPdf(x,0,s)/M.normPdf(0,0,1))*(top-24);
+  ctx.beginPath();ctx.moveTo(mid-4.4*sc,base);for(let x=-4.4;x<=4.4;x+=0.05)ctx.lineTo(mid+x*sc,y(x));ctx.lineTo(mid+4.4*sc,base);ctx.closePath();
+  ctx.fillStyle=alpha(C.a,0.12);ctx.fill();
+  ctx.beginPath();ctx.moveTo(mid-s*sc,base);for(let x=-s;x<=s;x+=0.03)ctx.lineTo(mid+x*sc,y(x));ctx.lineTo(mid+s*sc,base);ctx.closePath();ctx.fillStyle=alpha(C.mean,0.28);ctx.fill();
+  ctx.beginPath();for(let x=-4.4;x<=4.4;x+=0.05){const px=mid+x*sc;x===-4.4?ctx.moveTo(px,y(x)):ctx.lineTo(px,y(x));}ctx.strokeStyle=C.sd;ctx.lineWidth=2.5;ctx.stroke();
+  ctx.strokeStyle=C.muted;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(mid-4.4*sc,base);ctx.lineTo(mid+4.4*sc,base);ctx.stroke();
+  ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(mid,base);ctx.lineTo(mid,y(0)-6);ctx.stroke();ctx.setLineDash([]);
+  T(ctx,'μ',mid,base+20,{c:C.ink,s:14,w:600});
+  ctx.strokeStyle=C.mean;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(mid-s*sc,base+8);ctx.lineTo(mid+s*sc,base+8);ctx.stroke();
+  T(ctx,'±1 SD',mid+s*sc+8,base+12,{c:C.mean,s:12,w:600,a:'left'});
+  T(ctx,'σ = '+fmt(s,2),w-14,22,{c:C.muted,s:12,m:true,a:'right'});
+  },{minH:200});
+if(!REDUCED)tickers.push(()=>{if(hero.visible)hero.dirty=true;return hero.visible;});
+
+window.__core={$,$$,clamp,lerp,fmt,C,M,canvas,drag,T,axisX,circle,alpha,setRead,slider,select,tabs,rand,randn,seeded,tickers,kick,pyCell,cellOf,toPlayground,REDUCED,readColors,canvases,Py,runPy};
+})();
+(function(){
+'use strict';
+const {$,$$,clamp,lerp,fmt,C,M,canvas,drag,T,axisX,circle,alpha,setRead,slider,select,tabs,rand,randn,tickers,kick,toPlayground,REDUCED}=window.__core;
+
+/* ================= Chapter 1: centre & outliers ================= */
+(function(){
+  const A={pts:[3,4,5,5,6,7,8,9,12],lo:0,hi:20,hiT:20,mx:0,md:0,pos:[],init:false};
+  const hiFor=()=>clamp(Math.ceil((Math.max(...A.pts)+3)/5)*5,15,80);
+  const st=()=>{const p=A.pts,q1=M.pct(p,25),q3=M.pct(p,75),iqr=q3-q1,lf=q1-1.5*iqr,uf=q3+1.5*iqr;
+    return{n:p.length,mean:M.mean(p),med:M.median(p),sd:M.sd(p,1),q1,q3,iqr,lf,uf,out:p.filter(v=>v<lf||v>uf).length};};
+  const pad=30,X=(v,w)=>pad+(v-A.lo)/(A.hi-A.lo)*(w-2*pad),V=(x,w)=>A.lo+(x-pad)/(w-2*pad)*(A.hi-A.lo);
+  const o=canvas($('#cvCentre'),0.5,(ctx,w,h)=>{
+    const s=st();if(!A.init){A.mx=s.mean;A.md=s.med;A.init=true;}
+    const ay=Math.round(h*0.5),r=w<460?6:8;
+    // fences
+    ctx.setLineDash([5,4]);ctx.strokeStyle=alpha(C.bad,.7);ctx.lineWidth=1.2;
+    [[s.lf,'lower fence'],[s.uf,'upper fence']].forEach(([v,l])=>{if(v>=A.lo&&v<=A.hi){const x=X(v,w);ctx.beginPath();ctx.moveTo(x,24);ctx.lineTo(x,ay);ctx.stroke();T(ctx,l+' '+fmt(v,1),x,16,{c:C.bad,s:11});}});
+    ctx.setLineDash([]);
+    axisX(ctx,pad,w-pad,ay,A.lo,A.hi,5);
+    // dots (stacked)
+    const idx=A.pts.map((v,i)=>i).sort((a,b)=>A.pts[a]-A.pts[b]);const last=[];A.pos=[];
+    idx.forEach(i=>{const x=X(A.pts[i],w);let L=0;while(last[L]!==undefined&&x-last[L]<2*r+1)L++;last[L]=x;
+      const y=ay-r-4-L*(2*r+2);A.pos.push({i,x,y});const out=A.pts[i]<s.lf||A.pts[i]>s.uf;
+      circle(ctx,x,y,r,out?alpha(C.bad,.85):alpha(C.point,.85),out?C.bad:C.point,1.5);});
+    // mean / median markers
+    const mx=X(A.mx,w),dx=X(A.md,w);
+    ctx.fillStyle=C.mean;ctx.beginPath();ctx.moveTo(mx,ay+5);ctx.lineTo(mx-8,ay+19);ctx.lineTo(mx+8,ay+19);ctx.closePath();ctx.fill();
+    const flipM=mx>w-110,flipD=dx>w-120;
+    T(ctx,'mean '+fmt(s.mean,2),mx+(flipM?-13:13),ay+18,{c:C.mean,s:12,w:600,a:flipM?'right':'left'});
+    ctx.fillStyle=C.median;ctx.beginPath();ctx.moveTo(dx,ay+24);ctx.lineTo(dx+7,ay+32);ctx.lineTo(dx,ay+40);ctx.lineTo(dx-7,ay+32);ctx.closePath();ctx.fill();
+    T(ctx,'median '+fmt(s.med,2),dx+(flipD?-12:12),ay+36,{c:C.median,s:12,w:600,a:flipD?'right':'left'});
+    // box plot
+    const by=Math.round(h*0.86),bh=Math.round(h*0.07);const ins=A.pts.filter(v=>v>=s.lf&&v<=s.uf);const wl=Math.min(...ins),wh=Math.max(...ins);
+    ctx.strokeStyle=C.ink;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(X(wl,w),by);ctx.lineTo(X(s.q1,w),by);ctx.moveTo(X(s.q3,w),by);ctx.lineTo(X(wh,w),by);
+    ctx.moveTo(X(wl,w),by-bh/2);ctx.lineTo(X(wl,w),by+bh/2);ctx.moveTo(X(wh,w),by-bh/2);ctx.lineTo(X(wh,w),by+bh/2);ctx.stroke();
+    ctx.fillStyle=alpha(C.point,.18);ctx.fillRect(X(s.q1,w),by-bh,X(s.q3,w)-X(s.q1,w),bh*2);ctx.strokeRect(X(s.q1,w),by-bh,X(s.q3,w)-X(s.q1,w),bh*2);
+    ctx.strokeStyle=C.median;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(X(s.med,w),by-bh);ctx.lineTo(X(s.med,w),by+bh);ctx.stroke();
+    A.pts.forEach(v=>{if(v<s.lf||v>s.uf)circle(ctx,X(v,w),by,4.5,null,C.bad,1.6);});
+    T(ctx,'box plot',pad,by-bh-8,{a:'left',c:C.muted,s:11});
+    setRead($('#cRead'),[['n',s.n],['mean',fmt(s.mean,2),1],['median',fmt(s.med,2),1],['SD (n−1)',fmt(s.sd,2)],['Q1 · Q3',fmt(s.q1,1)+' · '+fmt(s.q3,1)],['IQR',fmt(s.iqr,2)],['fences',fmt(s.lf,1)+' … '+fmt(s.uf,1)],['outliers',s.out,s.out>0]]);
+  },{minH:300});
+  tickers.push(()=>{if(!A.init)return false;const s=st();const dm=s.mean-A.mx,dd=s.med-A.md,dh=hiFor()-A.hi;let mv=false;
+    if(Math.abs(dm)>0.005||Math.abs(dd)>0.005){A.mx+=dm*(REDUCED?1:0.2);A.md+=dd*(REDUCED?1:0.2);mv=true;}
+    if(Math.abs(dh)>0.05){A.hi+=dh*(REDUCED?1:0.12);mv=true;}else A.hi=hiFor();if(mv)o.dirty=true;return mv;});
+  drag(o,{hit:(x,y)=>{let b=null,bd=1e9;A.pos.forEach(p=>{const d=Math.hypot(p.x-x,p.y-y);if(d<bd){bd=d;b=p.i;}});return bd<16?b:null;},
+    move:(i,x)=>{A.pts[i]=clamp(Math.round(V(x,o.w)*10)/10,A.lo+0.2,A.hi-0.2);o.redraw();kick();},
+    dbl:(x,y,i)=>{if(i!=null){if(A.pts.length>3)A.pts.splice(i,1);}else if(y<o.h*0.5&&A.pts.length<40)A.pts.push(clamp(Math.round(V(x,o.w)*10)/10,A.lo+0.2,A.hi-0.2));o.redraw();kick();}});
+  $('#cAdd').onclick=()=>{A.pts.push(A.pts.some(v=>v>30)?38:35);o.redraw();kick();};
+  $('#cSkew').onclick=()=>{A.pts=[2,3,3,4,4,4,5,5,6,7,8,9,12,16,22,30];o.redraw();};
+  $('#cReset').onclick=()=>{A.pts=[3,4,5,5,6,7,8,9,12];o.redraw();};
+})();
+
+/* ================= Chapter 2: standard deviation story ================= */
+(function(){
+  const S={data:[2,4,4,4,5,5,7,9],step:0,a:[0,0,0,0,0,0,0],ddof:1,lo:0,hi:11,pos:[]};
+  const stat=()=>{const d=S.data,n=d.length,m=M.mean(d),dev=d.map(v=>v-m),sq=dev.map(v=>v*v),ssd=sq.reduce((a,b)=>a+b,0),varr=ssd/(n-S.ddof),sd=Math.sqrt(varr);
+    return{n,m,dev,sq,ssd,varr,sd,within:d.filter(v=>Math.abs(v-m)<=sd).length};};
+  const pad=30;
+  const o=canvas($('#cvSd'),w=>w<520?0.8:0.68,(ctx,w,h)=>{
+    const s=stat(),ppu=(w-2*pad)/(S.hi-S.lo),X=v=>pad+(v-S.lo)*ppu,y0=Math.round(h*0.56),a=S.a;
+    const maxd=Math.max(...s.dev.map(Math.abs),s.sd,0.01),sc=Math.min(1,(y0-70)/(maxd*ppu));
+    axisX(ctx,pad,w-pad,y0,S.lo,S.hi,1);
+    // SD band
+    if(a[6]>0.01){const l=X(s.m-s.sd*a[6]),r=X(s.m+s.sd*a[6]);ctx.fillStyle=alpha(C.sd,.16);ctx.fillRect(l,y0-100*sc-30,r-l,100*sc+30);
+      ctx.fillStyle=alpha(C.sd,.5);ctx.fillRect(l,y0-4,r-l,8);
+      T(ctx,'mean ± 1 SD',(l+r)/2,y0-100*sc-36,{c:C.sd,s:12,w:600});}
+    // squares
+    if(a[3]>0.01){S.data.forEach((v,i)=>{const d=s.dev[i],side=Math.abs(d)*ppu*sc*a[3];if(side<0.5)return;const x1=X(Math.min(s.m,v));
+      ctx.fillStyle=alpha(d>0?C.b:C.mean,.17);ctx.fillRect(x1,y0-14-side,Math.abs(d)*ppu,0);
+      ctx.fillStyle=alpha(d>0?C.b:C.mean,.17);ctx.strokeStyle=alpha(d>0?C.b:C.mean,.7);ctx.lineWidth=1.2;
+      const wpx=Math.abs(d)*ppu*(0.35+0.65*a[3]);const xs=d>0?X(s.m):X(s.m)-wpx;ctx.fillRect(xs,y0-14-side,wpx,side);ctx.strokeRect(xs,y0-14-side,wpx,side);});
+      const seen={};S.data.forEach((v,i)=>{if(seen[v]){seen[v]++;return;}seen[v]=1;});
+      Object.keys(seen).forEach(k=>{const v=+k,d=v-s.m,side=Math.abs(d)*ppu*sc;if(side>=18*1&&a[3]>.9){T(ctx,fmt(d*d,1)+(seen[k]>1?' ×'+seen[k]:''),X(s.m)+(d>0?1:-1)*Math.abs(d)*ppu/2,y0-14-side/2+4,{s:11,c:C.ink,m:true});}});}
+    // mean line
+    if(a[1]>0.01){ctx.setLineDash([5,4]);ctx.strokeStyle=alpha(C.mean,a[1]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X(s.m),y0+8);ctx.lineTo(X(s.m),y0-(y0-30)*a[1]);ctx.stroke();ctx.setLineDash([]);
+      T(ctx,'mean = '+fmt(s.m,2),X(s.m)+6,y0-(y0-30)*a[1]-6,{a:'left',c:C.mean,s:12,w:600});}
+    // deviation arrows
+    if(a[2]>0.01){S.data.forEach((v,i)=>{const d=s.dev[i];if(Math.abs(d)<0.01)return;const ay=y0+30+(i%3)*7,x0=X(s.m),x1=x0+(X(v)-x0)*a[2];
+      ctx.strokeStyle=d>0?C.b:C.mean;ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(x0,ay);ctx.lineTo(x1,ay);ctx.stroke();
+      const dir=d>0?1:-1;ctx.beginPath();ctx.moveTo(x1,ay);ctx.lineTo(x1-dir*6,ay-3.5);ctx.lineTo(x1-dir*6,ay+3.5);ctx.closePath();ctx.fill();});
+      if(a[2]>.9){const seen={};S.data.forEach((v,i)=>{if(seen[v]||Math.abs(s.dev[i])<.01)return;seen[v]=1;T(ctx,(s.dev[i]>0?'+':'')+fmt(s.dev[i],1),X(v)+(s.dev[i]>0?10:-10),y0+54+(i%3)*0,{s:10,c:C.muted,m:true,a:s.dev[i]>0?'left':'right'});});}}
+    // dots
+    const cnt={};S.data.forEach(v=>{cnt[v]=(cnt[v]||0)+1;});
+    S.pos=[];S.data.forEach((v,i)=>{const x=X(v);circle(ctx,x,y0,7,alpha(C.point,.9),C.bg,2);S.pos.push({i,x,y:y0});});
+    Object.keys(cnt).forEach(k=>{if(cnt[k]>1)T(ctx,'×'+cnt[k],X(+k),y0-14,{s:10,c:C.muted});});
+    // text lines
+    const L=[];
+    if(a[4]>0.5)L.push('Σ d² = '+(s.n<=10?s.sq.map(v=>fmt(v,0===v%1?0:1)).join(' + ')+' = ':'')+fmt(s.ssd,2));
+    if(a[5]>0.5)L.push('÷ '+(S.ddof?'(n−1) = ÷'+(s.n-1):'n = ÷'+s.n)+'   →   variance = '+fmt(s.varr,3));
+    if(a[6]>0.5)L.push('√variance   →   SD = '+fmt(s.sd,3));
+    L.forEach((t,i)=>T(ctx,t,pad,20+i*18,{a:'left',s:12.5,m:true,w:500}));
+    // average square
+    if(a[5]>0.01){const side=s.sd*ppu*sc*(0.3+0.7*a[5]),x1=w-pad-side,ty=y0+66;
+      ctx.fillStyle=alpha(C.sd,.2*a[5]);ctx.strokeStyle=alpha(C.sd,.9*a[5]);ctx.lineWidth=1.5;ctx.fillRect(x1,ty,side,side);ctx.strokeRect(x1,ty,side,side);
+      if(a[5]>.8){T(ctx,'average square',x1+side/2,ty+side/2-2,{s:11,c:C.sd,w:600});T(ctx,'area = '+fmt(s.varr,2),x1+side/2,ty+side/2+12,{s:11,c:C.sd,m:true});}
+      if(a[6]>.5){ctx.strokeStyle=C.mean;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x1,ty+side+7);ctx.lineTo(x1+side,ty+side+7);ctx.stroke();T(ctx,'side = SD',x1+side/2,ty+side+22,{s:11,c:C.mean,w:600});}}
+    if(sc<0.999&&a[3]>0.5)T(ctx,'squares drawn to scale ×'+fmt(sc,2),w-pad,h-6,{a:'right',s:10,c:C.muted});
+    setRead($('#sdRead'),[['n',s.n],['mean',fmt(s.m,3),1],['Σ d² (SSD)',fmt(s.ssd,2)],['variance',fmt(s.varr,3)],['SD',fmt(s.sd,3),1],['within ±1 SD',s.within+' of '+s.n]]);
+  },{minH:300});
+  const steps=$$('#sdSteps .st'),dots=$('#sdDots');dots.innerHTML=steps.map(()=>'<i></i>').join('');
+  function setStep(k){S.step=k;steps.forEach((e,i)=>e.classList.toggle('on',i===k));$$('i',dots).forEach((e,i)=>e.classList.toggle('on',i===k));$('#sdState').textContent='step '+(k+1)+' of 7';kick();}
+  tickers.push(()=>{let moving=false;for(let k=0;k<7;k++){const t=S.step>=k?1:0;if(Math.abs(S.a[k]-t)>0.004){S.a[k]+=(t-S.a[k])*(REDUCED?1:0.1);moving=true;}else S.a[k]=t;}if(moving)o.dirty=true;return moving;});
+  const sio=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)setStep(steps.indexOf(e.target));});},{rootMargin:'-42% 0px -42% 0px'});
+  steps.forEach(e=>sio.observe(e));setStep(0);S.a[0]=1;
+  $('#sdPrev').onclick=()=>steps[Math.max(0,S.step-1)].scrollIntoView({behavior:REDUCED?'auto':'smooth',block:'center'});
+  $('#sdNext').onclick=()=>steps[Math.min(6,S.step+1)].scrollIntoView({behavior:REDUCED?'auto':'smooth',block:'center'});
+  $$('#ddofBtns button').forEach(b=>b.onclick=()=>{S.ddof=+b.dataset.d;$$('#ddofBtns button').forEach(x=>x.classList.toggle('on',x===b));o.redraw();});
+  drag(o,{hit:(x,y)=>{const sc=S.pos;let b=null,bd=1e9;sc.forEach(p=>{const d=Math.abs(p.x-x);if(d<bd&&Math.abs(y-p.y)<24){bd=d;b=p.i;}});return bd<14?b:null;},
+    move:(i,x)=>{S.data[i]=clamp(Math.round((S.lo+(x-pad)/((o.w-2*pad)/(S.hi-S.lo)))*10)/10,0.3,10.7);o.redraw();}});
+})();
+
+/* ================= Chapter 2b: why n-1 ================= */
+(function(){
+  const D={n:5,cnt:0,sb:0,su:0,hb:[],hu:[],pend:0};
+  const o=canvas($('#cvDdof'),0.42,(ctx,w,h)=>{
+    const pl=44,pr=16,pt=16,pb=30,lo=40,hi=140,Y=v=>pt+(1-(clamp(v,lo,hi)-lo)/(hi-lo))*(h-pt-pb),N=Math.max(20,D.cnt),X=i=>pl+i/N*(w-pl-pr);
+    ctx.strokeStyle=C.grid;ctx.lineWidth=1;ctx.fillStyle=C.muted;
+    for(let v=40;v<=140;v+=20){ctx.beginPath();ctx.moveTo(pl,Y(v));ctx.lineTo(w-pr,Y(v));ctx.stroke();T(ctx,String(v),pl-6,Y(v)+4,{a:'right',c:C.muted,s:11});}
+    T(ctx,'samples drawn →',w-pr,h-8,{a:'right',c:C.muted,s:11});T(ctx,'0',pl,h-8,{c:C.muted,s:11});T(ctx,String(N),w-pr,h-18,{a:'right',c:C.muted,s:10});
+    ctx.setLineDash([6,4]);ctx.strokeStyle=C.median;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(pl,Y(100));ctx.lineTo(w-pr,Y(100));ctx.stroke();ctx.setLineDash([]);
+    T(ctx,'true variance 100',pl+6,Y(100)-6,{a:'left',c:C.median,s:11,w:600});
+    const line=(arr,col)=>{if(!arr.length)return;ctx.strokeStyle=col;ctx.lineWidth=2.2;ctx.beginPath();const step=Math.max(1,Math.floor(arr.length/600));
+      for(let i=0;i<arr.length;i+=step){const x=X(i+1),y=Y(arr[i]);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.lineTo(X(arr.length),Y(arr[arr.length-1]));ctx.stroke();};
+    line(D.hb,C.mean);line(D.hu,C.sd);
+    const th=100*(D.n-1)/D.n;ctx.setLineDash([2,4]);ctx.strokeStyle=C.mean;ctx.beginPath();ctx.moveTo(pl,Y(th));ctx.lineTo(w-pr,Y(th));ctx.stroke();ctx.setLineDash([]);
+    T(ctx,'theory for ÷n: '+fmt(th,1),w-pr,Y(th)+(th<100?16:-6),{a:'right',c:C.mean,s:11});
+    setRead($('#ddRead'),[['samples',D.cnt],['sample size n',D.n],['average ÷ n',D.cnt?fmt(D.sb/D.cnt,1):'—',1],['average ÷ (n−1)',D.cnt?fmt(D.su/D.cnt,1):'—',1],['theory ÷ n',fmt(th,1)]]);
+  },{minH:240});
+  function one(){const xs=Array.from({length:D.n},()=>50+10*randn()),m=M.mean(xs),ss=xs.reduce((s,v)=>s+(v-m)**2,0);D.sb+=ss/D.n;D.su+=ss/(D.n-1);D.cnt++;D.hb.push(D.sb/D.cnt);D.hu.push(D.su/D.cnt);}
+  const reset=()=>{D.cnt=0;D.sb=0;D.su=0;D.hb=[];D.hu=[];D.pend=0;o.redraw();};
+  slider($('#ddofCtrl'),'ddN','Sample size n',2,30,1,5,v=>v,v=>{D.n=v;reset();});
+  $('#dd1').onclick=()=>{one();o.redraw();};
+  $('#dd1000').onclick=()=>{D.pend+=1000;kick();};
+  $('#ddReset').onclick=reset;
+  tickers.push(()=>{if(D.pend>0){const k=Math.min(D.pend,REDUCED?1000:50);for(let i=0;i<k;i++)one();D.pend-=k;o.dirty=true;return true;}return false;});
+  one();
+})();
+
+/* ================= Chapter 3: shape ================= */
+(function(){
+  const K={s:0.7};
+  const sk=$('#skewRead'),o=canvas($('#cvSkew'),0.4,(ctx,w,h)=>{
+    const a=4*(1-0.62*K.s),b=4*(1+0.62*K.s),pl=24,pr=24,pt=34,pb=30,N=400;const xs=[],ys=[];let mx=0;
+    for(let i=0;i<=N;i++){const x=i/N;xs.push(x);const y=M.betaPdf(Math.min(Math.max(x,1e-6),1-1e-6),a,b);ys.push(y);mx=Math.max(mx,y);}
+    const X=x=>pl+x*(w-pl-pr),Y=y=>h-pb-y/mx*(h-pb-pt);
+    ctx.beginPath();ctx.moveTo(X(0),Y(0));xs.forEach((x,i)=>ctx.lineTo(X(x),Y(ys[i])));ctx.lineTo(X(1),Y(0));ctx.closePath();ctx.fillStyle=alpha(C.a,.16);ctx.fill();
+    ctx.beginPath();xs.forEach((x,i)=>i?ctx.lineTo(X(x),Y(ys[i])):ctx.moveTo(X(x),Y(ys[i])));ctx.strokeStyle=C.sd;ctx.lineWidth=2.4;ctx.stroke();
+    let cum=0,med=0;const tot=ys.reduce((s,v)=>s+v,0);for(let i=0;i<=N;i++){cum+=ys[i];if(cum>=tot/2){med=xs[i];break;}}
+    const mean=a/(a+b);axisX(ctx,pl,w-pr,h-pb,0,1,0.25);
+    ctx.lineWidth=2.2;ctx.strokeStyle=C.mean;ctx.beginPath();ctx.moveTo(X(mean),h-pb);ctx.lineTo(X(mean),pt-6);ctx.stroke();
+    ctx.strokeStyle=C.median;ctx.beginPath();ctx.moveTo(X(med),h-pb);ctx.lineTo(X(med),pt+8);ctx.stroke();
+    const left=mean<med;T(ctx,'mean',X(mean)+(left?-6:6),pt-10,{a:left?'right':'left',c:C.mean,s:12,w:600});T(ctx,'median',X(med)+(left?6:-6),pt+6,{a:left?'left':'right',c:C.median,s:12,w:600});
+    const sv=2*(b-a)*Math.sqrt(a+b+1)/((a+b+2)*Math.sqrt(a*b));
+    setRead(sk,[['skewness',(sv>=0?'+':'')+fmt(sv,2),1],['mean',fmt(mean,3)],['median',fmt(med,3)],['mean − median',fmt(mean-med,3)],['verdict',Math.abs(sv)<0.1?'symmetric':sv>0?'right-skewed (tail right)':'left-skewed (tail left)']]);
+  },{minH:220});
+  slider($('#skewCtrl'),'skS','Peak position ← left … right →',-100,100,1,70,v=>(v>0?'peak left, tail right ':v<0?'peak right, tail left ':'symmetric ')+'',v=>{K.s=v/100;o.redraw();});
+  /* kurtosis */
+  const Q={df:6,log:false};
+  const o2=canvas($('#cvKurt'),0.42,(ctx,w,h)=>{
+    const pl=40,pr=16,pt=14,pb=30,X=x=>pl+(x+5)/10*(w-pl-pr),f=Q.log?(y=>Math.log10(Math.max(y,1e-7))):(y=>y),lo=Q.log?-5:0,hi=Q.log?-0.2:0.45,Y=y=>pt+(1-(f(y)-lo)/(hi-lo))*(h-pt-pb);
+    const c=Math.sqrt(Q.df/(Q.df-2)),tz=z=>M.tPdf(z*c,Q.df)*c;
+    ctx.strokeStyle=C.grid;ctx.lineWidth=1;
+    (Q.log?[-1,-2,-3,-4,-5]:[0.1,0.2,0.3,0.4]).forEach(v=>{const y=Q.log?pt+(1-(v-lo)/(hi-lo))*(h-pt-pb):Y(v);ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(w-pr,y);ctx.stroke();T(ctx,Q.log?'1e'+v:String(v),pl-6,y+4,{a:'right',c:C.muted,s:11});});
+    axisX(ctx,pl,w-pr,h-pb,-5,5,1);
+    [3,-3].forEach(x=>{ctx.setLineDash([4,4]);ctx.strokeStyle=C.muted;ctx.beginPath();ctx.moveTo(X(x),pt);ctx.lineTo(X(x),h-pb);ctx.stroke();ctx.setLineDash([]);});
+    const curve=(fn,col,wd,fill)=>{ctx.beginPath();for(let x=-5;x<=5.001;x+=0.05){const px=X(x),py=Y(fn(x));x===-5?ctx.moveTo(px,py):ctx.lineTo(px,py);}ctx.strokeStyle=col;ctx.lineWidth=wd;ctx.stroke();};
+    curve(x=>M.normPdf(x),C.muted,2);curve(tz,C.mean,2.6);
+    T(ctx,'normal',X(-0.15),Y(M.normPdf(0))-6,{a:'right',c:C.muted,s:12,w:600});T(ctx,'t, df='+Q.df,X(0.15),Y(tz(0))-6,{a:'left',c:C.mean,s:12,w:600});
+    const pt3=2*(1-M.tCdf(3*c,Q.df)),pn3=2*(1-M.normCdf(3));
+    setRead($('#kurtRead'),[['excess kurtosis',fmt(6/(Q.df-4),2),1],['normal',0],['P(|Z|>3) t',fmt(pt3*100,2)+'%',1],['P(|Z|>3) normal',fmt(pn3*100,2)+'%'],['tail ratio',fmt(pt3/pn3,1)+'×']]);
+  },{minH:220});
+  slider($('#kurtCtrl'),'kuDf','Degrees of freedom (fewer = heavier tails)',5,100,1,6,v=>v,v=>{Q.df=v;o2.redraw();});
+  const bt=document.createElement('button');bt.className='btn';bt.textContent='Log scale (reveals the tails)';bt.onclick=()=>{Q.log=!Q.log;bt.classList.toggle('on',Q.log);o2.redraw();};$('#kurtCtrl').appendChild(bt);
+})();
+
+/* ================= Chapter 4: normal ================= */
+(function(){
+  const N={mu:15,sd:2,x:14,x2:16.2,mode:'less',p:0.1587,rule:0,run:false};
+  const pad=24,dom=()=>[N.mu-4.2*N.sd,N.mu+4.2*N.sd];
+  const X=(v,w)=>{const[a,b]=dom();return pad+(v-a)/(b-a)*(w-2*pad);},V=(x,w)=>{const[a,b]=dom();return a+(x-pad)/(w-2*pad)*(b-a);};
+  const prob=()=>{const c=v=>M.normCdf(v,N.mu,N.sd);if(N.mode==='less'||N.mode==='inv')return c(N.x);if(N.mode==='more')return 1-c(N.x);const lo=Math.min(N.x,N.x2),hi=Math.max(N.x,N.x2);return c(hi)-c(lo);};
+  const code=()=>{const m=N.mu,s=N.sd,r=v=>String(Math.round(v*100)/100);
+    if(N.mode==='less')return`norm.cdf(${r(N.x)}, ${r(m)}, ${r(s)})`;if(N.mode==='more')return`norm.sf(${r(N.x)}, ${r(m)}, ${r(s)})`;
+    if(N.mode==='inv')return`norm.ppf(${r(N.p)}, ${r(m)}, ${r(s)})`;const lo=Math.min(N.x,N.x2),hi=Math.max(N.x,N.x2);return`norm.cdf(${r(hi)}, ${r(m)}, ${r(s)}) - norm.cdf(${r(lo)}, ${r(m)}, ${r(s)})`;};
+  const o=canvas($('#cvNormal'),0.42,(ctx,w,h)=>{
+    const[a,b]=dom(),base=h-34,top=22,pk=M.normPdf(0,0,1)/N.sd,Y=y=>base-y/pk*(base-top-10);
+    const area=(l,r,col)=>{ctx.beginPath();ctx.moveTo(X(l,w),base);for(let v=l;v<=r+1e-9;v+=(b-a)/300)ctx.lineTo(X(v,w),Y(M.normPdf(v,N.mu,N.sd)));ctx.lineTo(X(r,w),base);ctx.closePath();ctx.fillStyle=col;ctx.fill();};
+    if(N.rule>0){[3,2,1].forEach(k=>{const t=clamp(N.rule-(k-1),0,1);if(t>0)area(N.mu-k*N.sd,N.mu+k*N.sd,alpha(C.a,.10+.12*(4-k)/3*t*1.0));});}
+    else{const lo=Math.min(N.x,N.x2),hi=Math.max(N.x,N.x2);const col=alpha(C.mean,.35);
+      if(N.mode==='less'||N.mode==='inv')area(a,N.x,col);else if(N.mode==='more')area(N.x,b,col);else area(lo,hi,col);}
+    ctx.beginPath();for(let v=a;v<=b;v+=(b-a)/300){const px=X(v,w),py=Y(M.normPdf(v,N.mu,N.sd));v===a?ctx.moveTo(px,py):ctx.lineTo(px,py);}ctx.strokeStyle=C.sd;ctx.lineWidth=2.5;ctx.stroke();
+    const step=N.sd>=2?2:N.sd>=1?1:0.5;axisX(ctx,pad,w-pad,base,a,b,step,{f:v=>String(Math.round(v*10)/10)});
+    ctx.setLineDash([4,4]);ctx.strokeStyle=C.muted;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X(N.mu,w),base);ctx.lineTo(X(N.mu,w),top+8);ctx.stroke();ctx.setLineDash([]);T(ctx,'μ = '+N.mu,X(N.mu,w),top+2,{c:C.muted,s:11});
+    if(N.rule>0){[1,2,3].forEach(k=>{const t=clamp(N.rule-(k-1),0,1);if(t>.99){const pc=[68.27,95.45,99.73][k-1];T(ctx,'±'+k+'σ  '+pc+'%',X(N.mu+(k-0.5)*N.sd,w),base-8-(3-k)*0,{s:11,c:C.ink,w:600});}});}
+    else{const ln=(v,l)=>{const x=X(v,w);ctx.strokeStyle=C.bad;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(x,base+2);ctx.lineTo(x,top+20);ctx.stroke();circle(ctx,x,top+20,6,C.bad);T(ctx,l,x,top+12,{c:C.bad,s:12,w:600,m:true});};
+      ln(N.x,(N.mode==='between'?'a = ':'x = ')+fmt(N.x,2));if(N.mode==='between')ln(N.x2,'b = '+fmt(N.x2,2));}
+    const pz=(N.x-N.mu)/N.sd,P=prob();
+    setRead($('#nRead'),[['z-score of x',fmt(pz,2),1],['probability',fmt(P*100,2)+'%',1],['complement',fmt((1-P)*100,2)+'%'],['x',fmt(N.x,2)],N.mode==='between'?['b',fmt(N.x2,2)]:['SD',N.sd]]);
+    $('#nCode').textContent=code();
+  },{minH:240});
+  const ctrl=$('#nCtrl');
+  const sMu=slider(ctrl,'nMu','Mean μ',5,25,0.5,15,v=>v,v=>{N.mu=v;N.rule=0;o.redraw();});
+  const sSd=slider(ctrl,'nSd','Std deviation σ',0.5,5,0.1,2,v=>fmt(v,1),v=>{N.sd=v;N.rule=0;o.redraw();});
+  const sX=slider(ctrl,'nX','x (or a)',0,40,0.1,14,v=>fmt(v,1),v=>{N.x=v;N.rule=0;o.redraw();});
+  const sX2=slider(ctrl,'nX2','b',0,40,0.1,16.2,v=>fmt(v,1),v=>{N.x2=v;N.rule=0;o.redraw();});
+  const sP=slider(ctrl,'nP','Probability to the left',1,99,1,16,v=>v+'%',v=>{N.p=v/100;N.x=M.normInv(N.p)*N.sd+N.mu;sX.set(N.x);N.rule=0;o.redraw();});
+  const modes=[['less','P(X < x)'],['more','P(X > x)'],['between','P(a < X < b)'],['inv','Find x from a probability']];
+  const sync=()=>{sX2.hide(N.mode!=='between');sP.hide(N.mode!=='inv');sX.hide(N.mode==='inv');};
+  tabs($('#nTabs'),modes,'less',m=>{N.mode=m;N.rule=0;if(m==='inv'){N.x=M.normInv(N.p)*N.sd+N.mu;}sync();o.redraw();});sync();
+  drag(o,{hit:(x,y)=>{const a=Math.abs(x-X(N.x,o.w)),b=Math.abs(x-X(N.x2,o.w));if(N.mode==='between'&&b<a&&b<20)return 2;return a<22||N.mode!=='inv'?1:null;},
+    move:(k,x)=>{const v=clamp(Math.round(V(x,o.w)*10)/10,dom()[0],dom()[1]);if(k===1){N.x=v;sX.set(clamp(v,0,40));}else{N.x2=v;sX2.set(clamp(v,0,40));}
+      if(N.mode==='inv'){N.p=M.normCdf(N.x,N.mu,N.sd);sP.set(Math.round(N.p*100));}N.rule=0;o.redraw();}});
+  $('#nRule').onclick=()=>{N.rule=REDUCED?3:0.001;N.run=!REDUCED;o.redraw();};
+  tickers.push(()=>{if(N.run&&N.rule>0){N.rule=Math.min(3,N.rule+0.022);if(N.rule>=3)N.run=false;o.dirty=true;return true;}return false;});
+  $('#nRun').onclick=()=>{toPlayground(`from scipy.stats import norm\nprint(${code()})`);};
+})();
+
+/* ================= Chapter 5: CLT ================= */
+(function(){
+  const POPS={expo:{name:'Exponential (right-skewed)',mu:1,sd:1,lo:0,hi:5,draw:()=>-Math.log(1-rand()),pdf:x=>Math.exp(-x)},
+    unif:{name:'Uniform',mu:.5,sd:Math.sqrt(1/12),lo:0,hi:1,draw:()=>rand(),pdf:x=>1},
+    bimo:{name:'Two humps',mu:.5,sd:Math.sqrt(.06*.06+.25*.25),lo:0,hi:1,draw:()=>(rand()<.5?.25:.75)+.06*randn(),pdf:x=>0.5*M.normPdf(x,.25,.06)+0.5*M.normPdf(x,.75,.06)},
+    logn:{name:'Lognormal (very skewed)',mu:Math.exp(.5),sd:Math.sqrt((Math.E-1)*Math.E),lo:0,hi:8,draw:()=>Math.exp(randn()),pdf:x=>x<=0?0:Math.exp(-(Math.log(x)**2)/2)/(x*Math.sqrt(2*Math.PI))}};
+  const S={pop:'expo',n:2,bins:36,counts:[],tot:0,sum:0,sum2:0,off:0,drops:[],pend:0};
+  const dom=()=>{const p=POPS[S.pop],se=p.sd/Math.sqrt(S.n);let lo=p.mu-3.6*se,hi=p.mu+3.6*se;if(S.pop==='expo'||S.pop==='logn'){lo=Math.max(0,lo);hi=Math.max(hi,p.mu+4.5*se);}return[lo,hi];};
+  const reset=()=>{S.counts=new Array(S.bins).fill(0);S.tot=0;S.sum=0;S.sum2=0;S.off=0;S.drops=[];S.pend=0;op.redraw();om.redraw();};
+  const newMean=()=>{const p=POPS[S.pop];let s=0;for(let i=0;i<S.n;i++)s+=p.draw();return s/S.n;};
+  const bin=v=>{const[a,b]=dom();return Math.floor((v-a)/(b-a)*S.bins);};
+  const add=v=>{const k=bin(v);S.tot++;S.sum+=v;S.sum2+=v*v;if(k>=0&&k<S.bins)S.counts[k]++;else S.off++;};
+  const op=canvas($('#cvPop'),0.7,(ctx,w,h)=>{const p=POPS[S.pop],pl=10,pb=26,pt=10,N=200;let mx=0;const ys=[];for(let i=0;i<=N;i++){const x=p.lo+(p.hi-p.lo)*i/N;const y=p.pdf(x);ys.push(y);mx=Math.max(mx,Math.min(y,6));}
+    const X=x=>pl+(x-p.lo)/(p.hi-p.lo)*(w-2*pl),Y=y=>h-pb-Math.min(y,mx)/mx*(h-pb-pt-14);
+    ctx.beginPath();ctx.moveTo(X(p.lo),h-pb);ys.forEach((y,i)=>ctx.lineTo(X(p.lo+(p.hi-p.lo)*i/N),Y(y)));ctx.lineTo(X(p.hi),h-pb);ctx.closePath();ctx.fillStyle=alpha(C.a,.18);ctx.fill();ctx.strokeStyle=C.sd;ctx.lineWidth=2;ctx.stroke();
+    ctx.strokeStyle=C.mean;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(X(p.mu),h-pb);ctx.lineTo(X(p.mu),pt);ctx.stroke();ctx.setLineDash([]);
+    T(ctx,'population',w/2,h-8,{c:C.muted,s:11});T(ctx,'μ',X(p.mu)+8,pt+8,{c:C.mean,s:12,w:600,a:'left'});},{minH:160});
+  const om=canvas($('#cvMeans'),0.52,(ctx,w,h)=>{const p=POPS[S.pop],[a,b]=dom(),pl=14,pr=14,pb=30,pt=12,base=h-pb,se=p.sd/Math.sqrt(S.n);
+    const X=v=>pl+(v-a)/(b-a)*(w-pl-pr),mxc=Math.max(...S.counts,12),d=(base-pt-10)/mxc*Math.min(1,1);
+    axisX(ctx,pl,w-pr,base,a,b,(b-a)/6,{f:v=>fmt(v,v<10?2:1)});
+    const bw=(w-pl-pr)/S.bins;
+    S.counts.forEach((c,i)=>{if(!c)return;const x=pl+i*bw;const ph=c*d;ctx.fillStyle=alpha(C.b,.55);ctx.fillRect(x+1,base-ph,bw-2,ph);
+      if(d>=5){ctx.strokeStyle=C.bg;ctx.lineWidth=1;for(let k=1;k<c;k++){ctx.beginPath();ctx.moveTo(x+1,base-k*d);ctx.lineTo(x+bw-1,base-k*d);ctx.stroke();}}});
+    if(S.tot>=8){ctx.beginPath();for(let i=0;i<=200;i++){const v=a+(b-a)*i/200,yy=base-S.tot*((b-a)/S.bins)*M.normPdf(v,p.mu,se)*d;i?ctx.lineTo(X(v),yy):ctx.moveTo(X(v),yy);}ctx.strokeStyle=C.mean;ctx.lineWidth=2.2;ctx.stroke();T(ctx,'normal curve, SE = σ/√n',w-pr,pt+10,{a:'right',c:C.mean,s:11,w:600});}
+    S.drops.forEach(dr=>circle(ctx,X(dr.v),dr.y,5,C.bad));
+    ctx.strokeStyle=C.muted;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(X(p.mu),base);ctx.lineTo(X(p.mu),pt);ctx.stroke();ctx.setLineDash([]);
+    const m=S.tot?S.sum/S.tot:NaN,sdv=S.tot>1?Math.sqrt(Math.max(0,S.sum2/S.tot-m*m)):NaN;
+    setRead($('#clRead'),[['means collected',S.tot],['sample size n',S.n],['mean of means',S.tot?fmt(m,3):'—',1],['SD of means',S.tot>1?fmt(sdv,3):'—',1],['theory σ/√n',fmt(se,3)],['off chart',S.off]]);},{minH:210});
+  tickers.push(()=>{let mv=false;const[a,b]=dom();
+    if(S.pend>0){const k=Math.min(S.pend,REDUCED?500:30);for(let i=0;i<k;i++)add(newMean());S.pend-=k;mv=true;}
+    if(S.drops.length){const mxc=Math.max(...S.counts,12),base=om.h-30,d=(base-22)/mxc;S.drops.forEach(dr=>{const k=bin(dr.v),c=k>=0&&k<S.bins?S.counts[k]:0;dr.vy+=0.9;dr.y+=dr.vy;const land=base-(c+0.5)*d;if(dr.y>=land){dr.done=true;}});
+      const fin=S.drops.filter(x=>x.done);fin.forEach(x=>add(x.v));S.drops=S.drops.filter(x=>!x.done);mv=true;}
+    if(mv)om.dirty=true;return mv;});
+  tabs($('#cltTabs'),Object.entries(POPS).map(([k,v])=>[k,v.name]),'expo',k=>{S.pop=k;reset();});
+  slider($('#cltCtrl'),'clN','Sample size n (each mean averages n values)',1,100,1,2,v=>v,v=>{S.n=v;reset();});
+  $('#cl1').onclick=()=>{if(REDUCED)add(newMean());else S.drops.push({v:newMean(),y:6,vy:0});om.redraw();};
+  $('#cl200').onclick=()=>{S.pend+=500;kick();};$('#clReset').onclick=reset;
+  reset();for(let i=0;i<3;i++)add(newMean());
+})();
+})();
+(function(){
+'use strict';
+const {$,$$,clamp,lerp,fmt,C,M,canvas,drag,T,axisX,circle,alpha,setRead,slider,select,tabs,rand,randn,tickers,kick,toPlayground,REDUCED}=window.__core;
+
+/* ================= Chapter 6: distribution explorer ================= */
+(function(){
+  const F={tab:'binom',n:15,p:0.8,lam:40,mg:5.21,df:19,q:'le',k:12,k2:14,x:7,x2:14,z:-0.5,side:'le',pp:99};
+  const ctrl=$('#dCtrl');
+  const dqs=[['eq','exactly k'],['le','at most k'],['ge','at least k'],['bt','between a and b (inclusive)']];
+  const kmax=()=>F.tab==='binom'?F.n:Math.ceil(F.lam+5*Math.sqrt(F.lam)+6);
+  const pmf=k=>F.tab==='binom'?M.binomPmf(k,F.n,F.p):M.poisPmf(k,F.lam);
+  const inSet=k=>{const a=Math.min(F.k,F.k2),b=Math.max(F.k,F.k2);return F.q==='eq'?k===F.k:F.q==='le'?k<=F.k:F.q==='ge'?k>=F.k:(k>=a&&k<=b);};
+  const r2=v=>String(Math.round(v*1000)/1000);
+  function calc(){
+    if(F.tab==='binom'||F.tab==='pois'){let P=0;for(let k=0;k<=kmax();k++)if(inSet(k))P+=pmf(k);
+      const f=F.tab==='binom'?'binom':'poisson',args=F.tab==='binom'?`${F.n}, ${r2(F.p)}`:`${r2(F.lam)}`,a=Math.min(F.k,F.k2),b=Math.max(F.k,F.k2);
+      const code=F.q==='eq'?`${f}.pmf(${F.k}, ${args})`:F.q==='le'?`${f}.cdf(${F.k}, ${args})`:F.q==='ge'?`${f}.sf(${F.k-1}, ${args})`:`${f}.cdf(${b}, ${args}) - ${f}.cdf(${a-1}, ${args})`;
+      return{P,code,extra:[['mean',fmt(F.tab==='binom'?F.n*F.p:F.lam,2)],['SD',fmt(F.tab==='binom'?Math.sqrt(F.n*F.p*(1-F.p)):Math.sqrt(F.lam),2)]]};}
+    if(F.tab==='expo'){const c=v=>M.exponCdf(v,F.mg),a=Math.min(F.x,F.x2),b=Math.max(F.x,F.x2);let P,code;
+      if(F.q==='le'){P=c(F.x);code=`expon.cdf(${r2(F.x)}, scale=${r2(F.mg)})`;}else if(F.q==='ge'){P=1-c(F.x);code=`expon.sf(${r2(F.x)}, scale=${r2(F.mg)})`;}
+      else if(F.q==='bt'){P=c(b)-c(a);code=`expon.cdf(${r2(b)}, scale=${r2(F.mg)}) - expon.cdf(${r2(a)}, scale=${r2(F.mg)})`;}
+      else{P=F.pp/100;code=`expon.ppf(${r2(F.pp/100)}, scale=${r2(F.mg)})`;}
+      return{P,code,extra:[['mean gap',fmt(F.mg,2)],['rate λ',fmt(1/F.mg,3)],['x for P='+F.pp+'%',fmt(-F.mg*Math.log(1-F.pp/100),2)]]};}
+    const cd=M.tCdf(F.z,F.df),cn=M.normCdf(F.z);const P=F.side==='le'?cd:F.side==='ge'?1-cd:2*(1-M.tCdf(Math.abs(F.z),F.df));
+    const code=F.side==='le'?`t.cdf(${r2(F.z)}, ${F.df})`:F.side==='ge'?`t.sf(${r2(F.z)}, ${F.df})`:`2 * t.sf(${r2(Math.abs(F.z))}, ${F.df})`;
+    const Pn=F.side==='le'?cn:F.side==='ge'?1-cn:2*(1-M.normCdf(Math.abs(F.z)));
+    return{P,code,extra:[['normal gives',fmt(Pn*100,2)+'%'],['difference',fmt((P-Pn)*100,2)+' pts']]};}
+  const o=canvas($('#cvDist'),0.4,(ctx,w,h)=>{
+    const R=calc(),pl=40,pr=14,pt=16,pb=32,base=h-pb;
+    if(F.tab==='binom'||F.tab==='pois'){const K=kmax(),ys=[];let mx=0;for(let k=0;k<=K;k++){const y=pmf(k);ys.push(y);mx=Math.max(mx,y);}
+      const bw=(w-pl-pr)/(K+1),Y=y=>base-y/(mx*1.12)*(base-pt);
+      ctx.strokeStyle=C.grid;ctx.lineWidth=1;for(let i=1;i<=3;i++){const v=mx*1.12*i/4,y=Y(v);ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(w-pr,y);ctx.stroke();T(ctx,fmt(v,3),pl-5,y+4,{a:'right',c:C.muted,s:10});}
+      ys.forEach((y,k)=>{const sel=inSet(k);ctx.fillStyle=sel?alpha(C.mean,.9):alpha(C.a,.38);ctx.fillRect(pl+k*bw+Math.min(1.5,bw*.1),Y(y),Math.max(1,bw-2*Math.min(1.5,bw*.1)),base-Y(y));
+        if(K<=24&&y>mx*.02)T(ctx,fmt(y,3).replace(/^0/,''),pl+k*bw+bw/2,Y(y)-4,{s:9,c:C.muted,m:true});});
+      const every=K<=20?1:K<=45?5:10;for(let k=0;k<=K;k+=every)T(ctx,String(k),pl+k*bw+bw/2,base+14,{c:C.muted,s:11});
+      ctx.strokeStyle=C.muted;ctx.beginPath();ctx.moveTo(pl,base);ctx.lineTo(w-pr,base);ctx.stroke();}
+    else if(F.tab==='expo'){const hi=F.mg*5,X=v=>pl+v/hi*(w-pl-pr),Y=v=>base-v/(1/F.mg)*(base-pt-6);
+      const a=Math.min(F.x,F.x2),b=Math.max(F.x,F.x2);let l=0,r=0;if(F.q==='le'){l=0;r=F.x;}else if(F.q==='ge'){l=F.x;r=hi;}else if(F.q==='bt'){l=a;r=b;}else{l=0;r=-F.mg*Math.log(1-F.pp/100);}
+      l=clamp(l,0,hi);r=clamp(r,0,hi);ctx.beginPath();ctx.moveTo(X(l),base);for(let v=l;v<=r+1e-9;v+=hi/300)ctx.lineTo(X(v),Y(M.exponPdf(v,F.mg)));ctx.lineTo(X(r),base);ctx.closePath();ctx.fillStyle=alpha(C.mean,.4);ctx.fill();
+      ctx.beginPath();for(let v=0;v<=hi;v+=hi/300)v?ctx.lineTo(X(v),Y(M.exponPdf(v,F.mg))):ctx.moveTo(X(v),Y(M.exponPdf(v,F.mg)));ctx.strokeStyle=C.sd;ctx.lineWidth=2.5;ctx.stroke();
+      axisX(ctx,pl,w-pr,base,0,hi,hi/6,{f:v=>fmt(v,v<10?1:0)});T(ctx,'mean gap '+fmt(F.mg,2),X(F.mg),Y(M.exponPdf(F.mg,F.mg))-8,{c:C.muted,s:11});
+      circle(ctx,X(F.mg),Y(M.exponPdf(F.mg,F.mg)),4,C.muted);}
+    else{const X=x=>pl+(x+5)/10*(w-pl-pr),Y=y=>base-y/0.42*(base-pt);const z=F.z,sh=(v)=>F.side==='le'?v<=z:F.side==='ge'?v>=z:Math.abs(v)>=Math.abs(z);
+      ctx.beginPath();let open=false;for(let v=-5;v<=5.0001;v+=0.02){if(sh(v)){if(!open){ctx.moveTo(X(v),base);open=true;}ctx.lineTo(X(v),Y(M.tPdf(v,F.df)));}else if(open){ctx.lineTo(X(v),base);open=false;}}if(open)ctx.lineTo(X(5),base);ctx.fillStyle=alpha(C.mean,.4);ctx.fill();
+      const cv=(fn,col,wd)=>{ctx.beginPath();for(let v=-5;v<=5.001;v+=0.05)v===-5?ctx.moveTo(X(v),Y(fn(v))):ctx.lineTo(X(v),Y(fn(v)));ctx.strokeStyle=col;ctx.lineWidth=wd;ctx.stroke();};
+      cv(v=>M.normPdf(v),C.muted,2);cv(v=>M.tPdf(v,F.df),C.sd,2.6);axisX(ctx,pl,w-pr,base,-5,5,1);
+      ctx.strokeStyle=C.bad;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X(z),base);ctx.lineTo(X(z),pt);ctx.stroke();T(ctx,'z = '+fmt(z,2),X(z),pt-3,{c:C.bad,s:11,w:600,m:true});
+      T(ctx,'normal',X(-2.3),Y(M.normPdf(-2.3))-6,{c:C.muted,s:11,a:'right'});T(ctx,'t, df = '+F.df,X(2.2),Y(M.tPdf(2.2,F.df))-8,{c:C.sd,s:11,w:600,a:'left'});}
+    setRead($('#dRead'),[['probability',fmt(R.P*100,3)+'%',1],['as decimal',fmt(R.P,4),1],...R.extra]);
+    $('#dCode').textContent=R.code;
+  },{minH:240});
+  const hints={binom:'Binomial: n independent yes/no trials with the same chance p. Class example: p = 0.8 of attending, n = 15 classes, "exactly 12" gives 0.2501, "at most 12" 0.6020, "at least 12" 0.6482.',
+    pois:'Poisson: counts in a window when only the average is known. Class example: mean 40 challans a day; "between 34 and 39" gives 0.3276.',
+    expo:'Exponential: time until the next event. Mean gap = 365/70 = 5.21 days. In 7 days: 0.7388. Days needed for 99%: 24.01. Notice the scale= in the code line.',
+    tdist:'Student t: a normal curve with heavier tails, used when σ is estimated from a small sample. The smaller df is, the more probability sits in the tails.'};
+  function build(){ctrl.innerHTML='';const upd=()=>o.redraw();
+    if(F.tab==='binom'){const kk=()=>{F.k=Math.min(F.k,F.n);F.k2=Math.min(F.k2,F.n);};
+      slider(ctrl,'dN','Trials n',1,60,1,F.n,v=>v,v=>{F.n=v;kk();skA.max=v;skB.max=v;skA.set(F.k);skB.set(F.k2);upd();});
+      slider(ctrl,'dP','Chance p',0.05,0.95,0.01,F.p,v=>fmt(v,2),v=>{F.p=v;upd();});}
+    if(F.tab==='pois')slider(ctrl,'dL','Average count λ',1,80,1,F.lam,v=>v,v=>{F.lam=v;F.k=Math.min(F.k,kmax());F.k2=Math.min(F.k2,kmax());skA.max=kmax();skB.max=kmax();skA.set(F.k);skB.set(F.k2);upd();});
+    var skA,skB;
+    if(F.tab==='binom'||F.tab==='pois'){select(ctrl,'dQ','Question',dqs,F.q,v=>{F.q=v;skB.hide(v!=='bt');skA.parentElement.querySelector('span').childNodes[0].nodeValue=(v==='bt'?'a':'k')+' ';upd();});
+      skA=slider(ctrl,'dK',F.q==='bt'?'a':'k',0,kmax(),1,F.k,v=>v,v=>{F.k=v;upd();});skB=slider(ctrl,'dK2','b',0,kmax(),1,F.k2,v=>v,v=>{F.k2=v;upd();});skB.hide(F.q!=='bt');}
+    if(F.tab==='expo'){const sx=[];
+      slider(ctrl,'dMg','Mean gap (scale)',0.5,30,0.01,F.mg,v=>fmt(v,2),v=>{F.mg=v;sx.forEach(s=>{s.max=Math.round(v*5*10)/10;});F.x=Math.min(F.x,v*5);F.x2=Math.min(F.x2,v*5);sx[0].set(F.x);sx[1].set(F.x2);upd();});
+      select(ctrl,'dQe','Question',[['le','within x (less than)'],['ge','more than x'],['bt','between a and b'],['inv','x for a probability']],F.q==='eq'?'le':F.q,v=>{F.q=v;vis();upd();});
+      sx.push(slider(ctrl,'dX','x (or a)',0,Math.round(F.mg*50)/10,0.1,F.x,v=>fmt(v,1),v=>{F.x=v;upd();}));sx.push(slider(ctrl,'dX2','b',0,Math.round(F.mg*50)/10,0.1,F.x2,v=>fmt(v,1),v=>{F.x2=v;upd();}));
+      const sp=slider(ctrl,'dPp','Probability',1,99,1,F.pp,v=>v+'%',v=>{F.pp=v;upd();});
+      var vis=()=>{sx[1].hide(F.q!=='bt');sx[0].hide(F.q==='inv');sp.hide(F.q!=='inv');};vis();}
+    if(F.tab==='tdist'){slider(ctrl,'dDf','Degrees of freedom',2,60,1,F.df,v=>v,v=>{F.df=v;upd();});slider(ctrl,'dZ','z value',-4,4,0.05,F.z,v=>fmt(v,2),v=>{F.z=v;upd();});
+      select(ctrl,'dSd','Tail',[['le','left tail P(T < z)'],['ge','right tail P(T > z)'],['two','two-sided P(|T| > |z|)']],F.side,v=>{F.side=v;upd();});}
+    $('#dHint').textContent=hints[F.tab];}
+  if(!['eq','le','ge','bt'].includes(F.q))F.q='le';
+  tabs($('#dTabs'),[['binom','Binomial'],['pois','Poisson'],['expo','Exponential'],['tdist',"Student's t"]],'binom',k=>{F.tab=k;if(k==='expo'&&F.q==='eq')F.q='le';if((k==='binom'||k==='pois')&&!['eq','le','ge','bt'].includes(F.q))F.q='le';
+    if(k==='binom'){F.n=15;F.p=0.8;F.k=12;F.k2=14;}if(k==='pois'){F.lam=40;F.k=35;F.k2=39;}if(k==='expo'){F.mg=5.21;F.x=7;F.x2=14;F.q='le';}build();o.redraw();});
+  build();
+  $('#dRun').onclick=()=>toPlayground(`from scipy.stats import binom, poisson, expon, t\nprint(${calc().code})`);
+})();
+
+/* ================= Chapter 7: Bayes ================= */
+(function(){
+  const B={mode:'screen',prev:1,sens:95,fpr:5,sa:50,sb:30,ra:3,rb:4,rc:5,dots:[]};
+  const hex=h=>{h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return[n>>16&255,n>>8&255,n&255];};
+  const mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
+  for(let i=0;i<1000;i++)B.dots.push({c:[128,128,128],t:[128,128,128]});
+  const model=()=>{
+    if(B.mode==='screen'){const sick=Math.round(1000*B.prev/100),tp=Math.round(sick*B.sens/100),fn=sick-tp,hl=1000-sick,fp=Math.round(hl*B.fpr/100),tn=hl-fp;
+      return{groups:[['sick, test positive',tp,hex(C.mean)],['sick, test negative (missed)',fn,hex(C.a)],['healthy, test positive',fp,hex(C.warn)],['healthy, test negative',tn,mix(hex(C.soft),hex(C.bg),.35)]],tp,fp,pos:tp+fp,post:tp+fp?tp/(tp+fp):NaN};}
+    const sc=1000-Math.round(B.sa*10)-Math.round(B.sb*10),n=[Math.round(B.sa*10),Math.round(B.sb*10),sc],r=[B.ra,B.rb,B.rc],d=n.map((m,i)=>Math.round(m*r[i]/100)),
+      base=[hex(C.a),hex(C.b),hex(C.c)],tot=d[0]+d[1]+d[2],names=['A','B','C'];const groups=[];
+    for(let i=0;i<3;i++){groups.push(['supplier '+names[i]+' · defective ('+d[i]+')',d[i],base[i]]);groups.push(['supplier '+names[i]+' · fine',n[i]-d[i],mix(base[i],hex(C.bg),.78)]);}
+    return{groups,n,d,tot,post:d.map(v=>tot?v/tot:NaN)};};
+  const o=canvas($('#cvBayes'),w=>(52+20*((w-32)/50)+70)/w,(ctx,w,h)=>{
+    const m=model(),sp=(w-32)/50,r=Math.max(2,sp*0.36),gy=52;let i=0;
+    m.groups.forEach(g=>{for(let k=0;k<g[1];k++){if(i<1000)B.dots[i++].t=g[2];}});
+    B.dots.forEach((d,j)=>{const x=16+(j%50)*sp+sp/2,y=gy+Math.floor(j/50)*sp+sp/2;circle(ctx,x,y,r,`rgb(${d.c.map(Math.round).join(',')})`);});
+    const head=B.mode==='screen'?(m.pos?`Of ${m.pos} positive tests, ${m.tp} are really sick: ${fmt(m.post*100,1)}%`:'No positive tests'):`Of ${m.tot} defective products, supplier A made ${m.d[0]}: ${fmt(m.post[0]*100,1)}%`;
+    T(ctx,head,16,26,{a:'left',s:15,w:600,c:C.ink});T(ctx,'1,000 cases',w-16,26,{a:'right',s:12,c:C.muted});
+    let lx=16,ly=gy+20*sp+22;ctx.font='12px Inter, system-ui, sans-serif';
+    m.groups.forEach(g=>{const t=`${g[0]}: ${g[1]}`;const tw=ctx.measureText(t).width+22;if(lx+tw>w-10){lx=16;ly+=18;}circle(ctx,lx+5,ly-4,5,`rgb(${g[2].map(Math.round).join(',')})`);T(ctx,t,lx+14,ly,{a:'left',s:12,c:C.ink});lx+=tw+10;});
+    if(B.mode==='screen')setRead($('#bRead'),[['P(positive | sick)',B.sens+'%'],['P(sick | positive)',m.pos?fmt(m.post*100,1)+'%':'—',1],['sick people',Math.round(1000*B.prev/100)],['positives',m.pos],['false alarms',m.fp]]);
+    else setRead($('#bRead'),[['P(A | defective)',fmt(m.post[0]*100,1)+'%',1],['P(B | defective)',fmt(m.post[1]*100,1)+'%',1],['P(C | defective)',fmt(m.post[2]*100,1)+'%',1],['share of supply','A '+B.sa+' · B '+B.sb+' · C '+(100-B.sa-B.sb)],['P(defective)',fmt(m.tot/10,1)+'%']]);
+  },{minH:300});
+  tickers.push(()=>{let mv=false;B.dots.forEach(d=>{for(let k=0;k<3;k++){const df=d.t[k]-d.c[k];if(Math.abs(df)>0.6){d.c[k]+=df*(REDUCED?1:0.16);mv=true;}else d.c[k]=d.t[k];}});if(mv)o.dirty=true;return mv;});
+  const ctrl=$('#bCtrl');
+  function build(){ctrl.innerHTML='';const u=()=>o.redraw();
+    if(B.mode==='screen'){slider(ctrl,'bPrev','Prevalence (how many are sick)',0.1,30,0.1,B.prev,v=>fmt(v,1)+'%',v=>{B.prev=v;u();});slider(ctrl,'bSens','Sensitivity P(+ | sick)',50,100,1,B.sens,v=>v+'%',v=>{B.sens=v;u();});slider(ctrl,'bFpr','False-positive rate P(+ | healthy)',0,30,1,B.fpr,v=>v+'%',v=>{B.fpr=v;u();});
+      $('#bHint').textContent='Default: 1% are sick, the test catches 95% of them and wrongly flags 5% of the healthy. Raise the prevalence to 20% and see how the answer jumps: the same test means something very different in a different population.';}
+    else{slider(ctrl,'bSa','Supplier A share',10,80,1,B.sa,v=>v+'%',v=>{B.sa=v;if(B.sa+B.sb>95){B.sb=95-B.sa;sb.set(B.sb);}u();});const sb=slider(ctrl,'bSb','Supplier B share',10,80,1,B.sb,v=>v+'%',v=>{B.sb=v;if(B.sa+B.sb>95){B.sa=95-B.sb;$('#bSa').value=B.sa;$('#bSaV').textContent=B.sa+'%';}u();});
+      slider(ctrl,'bRa','Defect rate A',0,10,0.1,B.ra,v=>fmt(v,1)+'%',v=>{B.ra=v;u();});slider(ctrl,'bRb','Defect rate B',0,10,0.1,B.rb,v=>fmt(v,1)+'%',v=>{B.rb=v;u();});slider(ctrl,'bRc','Defect rate C',0,10,0.1,B.rc,v=>fmt(v,1)+'%',v=>{B.rc=v;u();});
+      $('#bHint').textContent='Class problem: A, B, C supply 50%, 30%, 20% with defect rates 3%, 4%, 5%. Of the 37 defective items, 15 came from A, so P(A | defective) = 15/37 = 40.5%.';}}
+  tabs($('#bTabs'),[['screen','Screening test'],['supplier','Supplier problem (22 Oct)']],'screen',k=>{B.mode=k;build();o.redraw();});build();
+})();
+
+/* ================= Chapter 8: correlation ================= */
+(function(){
+  const ANS={I:[[10,8,13,9,11,14,6,4,12,7,5],[8.04,6.95,7.58,8.81,8.33,9.96,7.24,4.26,10.84,4.82,5.68]],
+    II:[[10,8,13,9,11,14,6,4,12,7,5],[9.14,8.14,8.74,8.77,9.26,8.10,6.13,3.10,9.13,7.26,4.74]],
+    III:[[10,8,13,9,11,14,6,4,12,7,5],[7.46,6.77,12.74,7.11,7.81,8.84,6.08,5.39,8.15,6.42,5.73]],
+    IV:[[8,8,8,8,8,8,8,19,8,8,8],[6.58,5.76,7.71,8.84,8.47,7.04,5.25,12.50,5.56,7.91,6.89]]};
+  const cloud=()=>{const rr=(function(s){let a=s;return()=>{a=(a*1664525+1013904223)>>>0;return a/4294967296;};})(77);const g=()=>{let u=0;while(!u)u=rr();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rr());};
+    return Array.from({length:18},()=>{const x=2+rr()*14;return[Math.round(x*10)/10,Math.round(clamp(2+0.7*x+1.6*g(),0.3,19.7)*10)/10];});};
+  const Z={pts:cloud(),res:false,pos:[],name:'cloud'};
+  const fit=()=>{const n=Z.pts.length,mx=M.mean(Z.pts.map(p=>p[0])),my=M.mean(Z.pts.map(p=>p[1]));let sxx=0,sxy=0,syy=0;Z.pts.forEach(([x,y])=>{sxx+=(x-mx)**2;sxy+=(x-mx)*(y-my);syy+=(y-my)**2;});
+    const b=sxx>1e-9?sxy/sxx:0,a=my-b*mx,r=sxx>1e-9&&syy>1e-9?sxy/Math.sqrt(sxx*syy):0;return{n,a,b,r,r2:r*r};};
+  const pl=40,pr=16,pt=14,pb=30;
+  const o=canvas($('#cvCorr'),0.72,(ctx,w,h)=>{const X=v=>pl+v/20*(w-pl-pr),Y=v=>h-pb-v/20*(h-pb-pt),f=fit();
+    ctx.strokeStyle=C.grid;ctx.lineWidth=1;for(let v=0;v<=20;v+=5){ctx.beginPath();ctx.moveTo(X(v),pt);ctx.lineTo(X(v),h-pb);ctx.stroke();ctx.beginPath();ctx.moveTo(pl,Y(v));ctx.lineTo(w-pr,Y(v));ctx.stroke();T(ctx,String(v),pl-6,Y(v)+4,{a:'right',c:C.muted,s:11});T(ctx,String(v),X(v),h-pb+15,{c:C.muted,s:11});}
+    if(Z.res)Z.pts.forEach(([x,y])=>{const yh=f.a+f.b*x,d=y-yh,s=Math.abs(d)/20*(w-pl-pr)*0.8;ctx.fillStyle=alpha(C.mean,.12);ctx.fillRect(X(x),Y(Math.max(y,yh)),s,Math.abs(Y(y)-Y(yh)));ctx.strokeStyle=alpha(C.mean,.8);ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(X(x),Y(y));ctx.lineTo(X(x),Y(yh));ctx.stroke();});
+    ctx.strokeStyle=C.mean;ctx.lineWidth=2.6;ctx.beginPath();let st=false;[0,20].forEach(x=>{const y=f.a+f.b*x;if(Math.abs(f.b)>1e5)return;ctx[st?'lineTo':'moveTo'](X(x),Y(clamp(y,-5,25)));st=true;});ctx.stroke();
+    Z.pos=[];Z.pts.forEach((p,i)=>{circle(ctx,X(p[0]),Y(p[1]),7,alpha(C.point,.9),C.bg,2);Z.pos.push({i,x:X(p[0]),y:Y(p[1])});});
+    T(ctx,`y = ${fmt(f.a,2)} + ${fmt(f.b,3)} x`,w-pr-4,pt+16,{a:'right',s:13,m:true,c:C.mean,w:500});
+    setRead($('#corrRead'),[['n',f.n],['r',fmt(f.r,3),1],['R² = r²',fmt(f.r2,3),1],['slope',fmt(f.b,3)],['intercept',fmt(f.a,2)],['dataset',Z.name]]);
+  },{minH:300});
+  drag(o,{hit:(x,y)=>{let b=null,bd=1e9;Z.pos.forEach(p=>{const d=Math.hypot(p.x-x,p.y-y);if(d<bd){bd=d;b=p.i;}});return bd<18?b:null;},
+    move:(i,x,y)=>{const w=o.w,h=o.h;Z.pts[i]=[clamp(Math.round((x-pl)/(w-pl-pr)*200)/10,0,20),clamp(Math.round((h-pb-y)/(h-pb-pt)*200)/10,0,20)];Z.name='edited';o.redraw();}});
+  const bt=$('#corrBtns'),mk=(t,fn,c)=>{const b=document.createElement('button');b.className='btn'+(c?' on':'');b.textContent=t;b.onclick=fn;bt.appendChild(b);return b;};
+  mk('Random cloud',()=>{Z.pts=cloud();Z.name='cloud';o.redraw();});
+  Object.keys(ANS).forEach(k=>mk('Anscombe '+k,()=>{Z.pts=ANS[k][0].map((x,i)=>[x,ANS[k][1][i]]);Z.name='Anscombe '+k;o.redraw();}));
+  mk('Add an outlier',()=>{Z.pts.push([16,2]);Z.name='edited';o.redraw();});
+  const rb=mk('Show residuals',()=>{Z.res=!Z.res;rb.classList.toggle('on',Z.res);rb.textContent=Z.res?'Hide residuals':'Show residuals';o.redraw();});
+  $('#corrRun').onclick=()=>{const xs=Z.pts.map(p=>p[0]).join(', '),ys=Z.pts.map(p=>p[1]).join(', ');
+    toPlayground(`import numpy as np\nfrom scipy.stats import pearsonr\n\nx = np.array([${xs}])\ny = np.array([${ys}])\nr, p = pearsonr(x, y)\nslope, intercept = np.polyfit(x, y, 1)\nprint("r = %.3f   R2 = %.3f   p = %.4f" % (r, r*r, p))\nprint("y = %.2f + %.3f x" % (intercept, slope))`);};
+})();
+
+/* ================= Chapter 9: testing ================= */
+(function(){
+  const E={diff:0,sd:10,n:30,ps:[],last:null,pend:0};
+  const exp1=()=>{const n=E.n,a=Array.from({length:n},()=>100+E.sd*randn()),b=Array.from({length:n},()=>100+E.diff+E.sd*randn());
+    const ma=M.mean(a),mb=M.mean(b),va=M.sd(a,1)**2/n,vb=M.sd(b,1)**2/n,t=(mb-ma)/Math.sqrt(va+vb),df=(va+vb)**2/(va*va/(n-1)+vb*vb/(n-1)),p=2*(1-M.tCdf(Math.abs(t),df));
+    E.ps.push(p);E.last={a,b,ma,mb,t,df,p};};
+  const o=canvas($('#cvTest'),0.46,(ctx,w,h)=>{
+    const lw=Math.round(w*0.42),pb=30,pt=22;
+    // left: last experiment
+    T(ctx,'last experiment',12,16,{a:'left',s:12,c:C.muted,w:600});
+    const L=E.last,lo=50,hi=150,X=v=>14+(v-lo)/(hi-lo)*(lw-28);
+    axisX(ctx,14,lw-14,h-pb,lo,hi,25);
+    if(L){[[L.a,L.ma,0.33,C.a,'A'],[L.b,L.mb,0.66,C.b,'B']].forEach(([arr,m,fy,col,nm])=>{const y=pt+(h-pb-pt)*fy;ctx.strokeStyle=C.grid;ctx.beginPath();ctx.moveTo(14,y);ctx.lineTo(lw-14,y);ctx.stroke();
+      arr.forEach((v,i)=>circle(ctx,X(clamp(v,lo,hi)),y+((i*37)%21-10),3.2,alpha(col,.6)));ctx.strokeStyle=col;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(X(m),y-16);ctx.lineTo(X(m),y+16);ctx.stroke();T(ctx,'group '+nm+'  mean '+fmt(m,1),14,y-18,{a:'left',s:11,c:col,w:600});});
+      T(ctx,`diff ${fmt(L.mb-L.ma,1)} · t ${fmt(L.t,2)} · p ${L.p<0.001?'<0.001':fmt(L.p,3)}`,14,h-pb+30>h?h-4:h-pb+28,{a:'left',s:12,m:true,c:L.p<0.05?C.mean:C.ink,w:600});}
+    else T(ctx,'press “Run 1 experiment”',lw/2,h/2,{c:C.muted,s:12});
+    // right: histogram of p-values
+    const x0=lw+30,x1=w-14,bins=20,cnt=new Array(bins).fill(0);E.ps.forEach(p=>cnt[Math.min(bins-1,Math.floor(p*bins))]++);const mx=Math.max(...cnt,5),by=h-pb,bw=(x1-x0)/bins;
+    T(ctx,'p-values from every experiment so far',x0,16,{a:'left',s:12,c:C.muted,w:600});
+    cnt.forEach((c,i)=>{const hh=c/mx*(by-pt-8);ctx.fillStyle=i===0?alpha(C.mean,.9):alpha(C.a,.5);ctx.fillRect(x0+i*bw+1,by-hh,bw-2,hh);});
+    ctx.strokeStyle=C.muted;ctx.beginPath();ctx.moveTo(x0,by);ctx.lineTo(x1,by);ctx.stroke();[0,0.05,0.5,1].forEach(v=>T(ctx,String(v),x0+v*(x1-x0),by+15,{c:C.muted,s:11}));
+    T(ctx,'p = 0.05',x0+0.05*(x1-x0)+4,pt+14,{a:'left',s:11,c:C.mean,w:600});
+    const sig=E.ps.filter(p=>p<0.05).length,sh=E.ps.length?sig/E.ps.length:NaN;
+    setRead($('#tRead'),[['experiments',E.ps.length],['p < 0.05',E.ps.length?sig+' ('+fmt(sh*100,1)+'%)':'—',1],[E.diff===0?'Type I error rate':'power',E.ps.length?fmt(sh*100,1)+'%':'—',1],['true difference',E.diff],['n per group',E.n]]);
+  },{minH:260});
+  const reset=()=>{E.ps=[];E.last=null;E.pend=0;o.redraw();};
+  const hint=()=>{$('#tHint').textContent=E.diff===0?'True difference is 0, so every "significant" result is a false alarm. Run 1,000: about 5% will be.':'A real difference exists. The share of experiments with p < 0.05 is the power of this design. Shrink n or raise the noise and watch it fall.';};
+  const c=$('#tCtrl');slider(c,'tD','True difference between groups',0,15,0.5,0,v=>fmt(v,1),v=>{E.diff=v;reset();hint();});slider(c,'tS','Noise (SD within each group)',5,20,1,10,v=>v,v=>{E.sd=v;reset();});slider(c,'tN','n per group',5,100,1,30,v=>v,v=>{E.n=v;reset();});
+  $('#t1').onclick=()=>{exp1();o.redraw();};$('#t1000').onclick=()=>{E.pend+=1000;kick();};$('#tReset').onclick=reset;
+  tickers.push(()=>{if(E.pend>0){const k=Math.min(E.pend,REDUCED?1000:40);for(let i=0;i<k;i++)exp1();E.pend-=k;o.dirty=true;return true;}return false;});
+  exp1();
+})();
+
+/* ================= Chapter 10: playground ================= */
+(function(){
+  const EX=[
+['Describe a column',`import numpy as np
+import pandas as pd
+
+rng = np.random.default_rng(5)
+s = pd.Series(rng.gamma(2.0, 20000, 300).round())    # salary-like, right-skewed
+print(s.describe())
+q1, q3 = s.quantile([.25, .75])
+iqr = q3 - q1
+print("fences:", q1 - 1.5*iqr, q3 + 1.5*iqr)
+print("skew %.2f   kurtosis %.2f" % (s.skew(), s.kurt()))
+print("mean > median ->", s.mean() > s.median())`],
+['np.where and conditions',`import numpy as np
+
+a1 = np.array([3, 6, 5, 7, 9, 8, 7, 5, 4, 6, 5, 7, 10, 3])
+ind = np.where((a1 >= 4) & (a1 <= 7))
+print("indices:", ind[0])
+print("count  :", len(ind[0]), (( a1 >= 4) & (a1 <= 7)).sum())
+print("values :", a1[ind[0]])
+print("OR     :", a1[(a1 < 4) | (a1 > 9)])`],
+['merge, outer join, fillna',`import pandas as pd
+
+sal = pd.DataFrame({"Name": ["Amit", "Beena", "Chetan", "Divya"], "EmpID": [101, 102, 103, 104], "Salary": [50, 70, 60, 80]})
+dep = pd.DataFrame({"Name": ["Amit", "Beena", "Eshan", "Farah"], "EmpID": [101, 102, 105, 106], "Deptt": ["IT", "HR", "IT", "IT"]})
+df3 = pd.merge(sal, dep, how="outer")
+print(df3, "\\n")
+df3["Salary"] = df3.Salary.fillna(df3.Salary.median())
+df3["Deptt"] = df3.Deptt.fillna(df3.Deptt.mode()[0])
+print(df3)`],
+['groupby and pivot_table',`import numpy as np
+import pandas as pd
+
+rng = np.random.default_rng(21)
+df = pd.DataFrame({"MaterialID": rng.choice(["M101", "M102", "M103"], 40),
+                   "Location": rng.choice(["MWH-1", "MWH-2"], 40),
+                   "Quantity": rng.integers(50, 500, 40)})
+print(df.groupby("MaterialID").Quantity.agg(["size", "sum", "mean"]).reset_index(), "\\n")
+print(df.pivot_table(index="Location", columns="MaterialID", values="Quantity", aggfunc="sum", fill_value=0, margins=True))`],
+['Regression with a dummy variable',`import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+
+rng = np.random.default_rng(1)
+n = 800
+yrs = rng.integers(0, 40, n)
+gender = np.where(rng.random(n) < 0.8, "Male", "Female")
+salary = 92356 + 747.6*yrs + 9071.8*(gender == "Male") + rng.normal(0, 6000, n)
+df = pd.DataFrame({"yrs_service": yrs, "gender": gender, "salary": salary})
+d = pd.get_dummies(df.gender, drop_first=True).astype(int)
+X = pd.concat([df[["yrs_service"]], d], axis=1)
+m = LinearRegression().fit(X, df.salary)
+print(dict(zip(X.columns, m.coef_.round(1))), "intercept", round(m.intercept_))`],
+['Logistic regression',`import numpy as np
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+
+rng = np.random.default_rng(11)
+n = 3000
+df = pd.DataFrame({"Glucose": rng.normal(120, 30, n).round(), "Age": rng.integers(21, 70, n)})
+p = 1/(1 + np.exp(-(-9 + 0.06*df.Glucose + 0.015*df.Age)))
+y = (rng.random(n) < p).astype(int)
+m = LogisticRegression(max_iter=2000).fit(df, y)
+print("coefficients:", dict(zip(df.columns, m.coef_[0].round(3))))
+print("odds multiplier per glucose unit: %.3f" % np.exp(m.coef_[0][0]))
+print("accuracy: %.3f" % m.score(df, y))`],
+['Chi-square test',`import numpy as np
+import pandas as pd
+from scipy.stats import chi2_contingency
+
+rng = np.random.default_rng(5)
+diet = rng.choice(["Diet1", "Diet2", "Diet3"], 600)
+out = (rng.random(600) < np.where(diet == "Diet2", 0.20, 0.38)).astype(int)
+tab = pd.crosstab(out, diet)
+print(tab)
+chi2, p, dof, exp = chi2_contingency(tab)
+print("chi2 = %.2f  dof = %d  p = %.5f" % (chi2, dof, p))`],
+['Binomial, Poisson, normal',`from scipy.stats import binom, poisson, norm
+
+print("binom exactly 12 of 15 :", binom.pmf(12, 15, 0.8))
+print("binom at least 12      :", binom.sf(11, 15, 0.8))
+print("poisson 34..39         :", poisson.cdf(39, 40) - poisson.cdf(33, 40))
+print("normal P(X<14)         :", norm.cdf(14, 15, 2))
+print("90% guarantee, LED bulb:", norm.ppf(0.10, 500, 150))`],
+['Bayes: supplier problem',`import numpy as np
+
+share  = np.array([0.50, 0.30, 0.20])
+defect = np.array([0.03, 0.04, 0.05])
+joint = share * defect
+print("P(defective) =", joint.sum())
+print("P(A, B, C | defective) =", (joint / joint.sum()).round(4))`],
+['Outliers with IQR fences',`import numpy as np
+
+rng = np.random.default_rng(8)
+x = np.concatenate([rng.normal(2.0, 0.3, 100), rng.normal(4.3, 0.4, 172), [9, 15]])
+q1, q3 = np.percentile(x, [25, 75])
+iqr = q3 - q1
+lo, hi = q1 - 1.5*iqr, q3 + 1.5*iqr
+print("Q1 %.2f  Q3 %.2f  IQR %.2f  fences %.2f .. %.2f" % (q1, q3, iqr, lo, hi))
+print("outliers:", x[(x < lo) | (x > hi)])`]];
+  const sel=$('#exSel'),ta=$('#playTa'),out=$('#playOut'),st=$('#playSt');
+  sel.innerHTML='<option value="">Load an example…</option>'+EX.map((e,i)=>`<option value="${i}">${e[0]}</option>`).join('');
+  ta.value=EX[0][1];
+  sel.onchange=()=>{if(sel.value!=='')ta.value=EX[+sel.value][1];};
+  const go=()=>window.__core.runPy(ta.value,out,st);
+  $('#playRun').onclick=go;$('#playClear').onclick=()=>{out.hidden=true;out.textContent='';};
+  ta.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();go();}if(e.key==='Tab'){e.preventDefault();ta.setRangeText('    ',ta.selectionStart,ta.selectionEnd,'end');}});
+  window.__examples=EX;
+})();
+})();
+</script>
+</body></html>
