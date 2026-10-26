@@ -606,6 +606,7 @@ td .git:hover{text-decoration:underline}
   .al-band{margin-top:0}
   .al-tag{width:2.6rem;height:2.6rem;font-size:.9rem;border-radius:12px}
 }
+<<<<<<< HEAD
 
 /* =================================================== QUIZZES & CONTESTS */
 .qcode{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88em;background:rgba(90,47,158,.08);color:#3a2f8f;padding:.08em .38em;border-radius:5px}
@@ -890,3 +891,5 @@ td .git:hover{text-decoration:underline}
   .nring{width:76px;height:76px}.nring__in{width:58px;height:58px}.nring__in b{font-size:1.05rem}
   .ngrid{grid-template-columns:1fr}.rnavs{grid-template-columns:1fr}.nchip--u{margin-left:0}
 }
+=======
+>>>>>>> origin/main

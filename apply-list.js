@@ -1,0 +1,12 @@
+const fs=require("fs"), path=require("path");
+const P=__dirname, A="E:/Ascend-2026/assets/";
+const rd=f=>fs.readFileSync(path.join(P,f),"utf8").replace(/\r\n/g,"\n");
+let js=fs.readFileSync(A+"app.js","utf8");
+const start="async function viewAssignments(mount){", end="/* ---- Assignment page helpers";
+const i=js.indexOf(start), j=js.indexOf(end,i);
+if(i<0||j<0) throw new Error("markers not found");
+js=js.slice(0,i)+rd("list.js")+js.slice(j);
+fs.writeFileSync(A+"app.js",js);
+let st=fs.readFileSync(A+"styles.css","utf8");
+if(!st.includes("ASSIGNMENTS LIST")) fs.writeFileSync(A+"styles.css",st+rd("list.css"));
+console.log("list applied");
