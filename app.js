@@ -393,6 +393,19 @@ const db = {
     if(DEMO) return DemoStore.contestSave(qid,ans);
     const {error}=await sb.rpc("contest_save",{qid,ans}); if(error) throw error;
   },
+  /* ---- monthly tests: RLS returns only the signed-in person's own row (managers see all) ---- */
+  async tests(){
+    if(DEMO) return [];
+    const {data,error}=await sb.from("tests").select("*").order("held_on",{ascending:false}); if(error) throw error; return data||[];
+  },
+  async myTestResults(userId){
+    if(DEMO) return [];
+    const {data,error}=await sb.from("test_results").select("*").eq("user_id",userId); if(error) throw error; return data||[];
+  },
+  async allTestResults(testId){
+    if(DEMO) return [];
+    const {data,error}=await sb.from("test_results").select("*").eq("test_id",testId); if(error) throw error; return data||[];
+  },
   async contestBoard(qid){
     if(DEMO) return DemoStore.contestBoard(qid);
     const {data,error}=await sb.rpc("contest_leaderboard",{qid}); if(error) throw error; return data||[];
@@ -566,7 +579,7 @@ async function render(){
       dashboard:viewDashboard, courses:viewCourses, course:viewCourse,
       notes:viewNotes, note:viewNote, prereq:viewPrereq,
       assignments:viewAssignments, assignment:viewAssignment,
-      quizzes:viewQuizzes, quiz:viewQuiz, leaderboard:viewLeaderboard,
+      quizzes:viewQuizzes, quiz:viewQuiz, leaderboard:viewLeaderboard, results:viewResults,
       playground:viewPlayground,
       capstone:viewCapstone,
       schedule:viewSchedule, recordings:viewRecordings, session:viewSession,
@@ -695,8 +708,8 @@ function navForRole(){
     {name:"capstone",label:"Capstone project",icon:I.rocket},
     {name:"forum",label:"Discussion forum",icon:I.chat},
   ];
-  const staffExtra=[{name:"submissions",label:"My submissions",icon:I.inbox}];
-  const mgrExtra=[{name:"review",label:"Review work",icon:I.inbox}];
+  const staffExtra=[{name:"submissions",label:"My submissions",icon:I.inbox},{name:"results",label:"My test results",icon:I.award}];
+  const mgrExtra=[{name:"review",label:"Review work",icon:I.inbox},{name:"results",label:"Test results",icon:I.award}];
   const learning = Auth.canManage ? [...base, ...mgrExtra] : [...base, ...staffExtra];
   const admin = Auth.isAdmin ? [{name:"admin",label:"Manage people",icon:I.award}] : [];
   return {learning, admin};
@@ -2502,6 +2515,67 @@ async function viewLeaderboard(mount,r){
     const csv=[head,...body].map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
     const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
     a.download=(cur?cur.title:"Overall leaderboard").replace(/[^a-z0-9]+/gi,"_")+".csv"; a.click();
+  });
+}
+
+/* ========================================================= TEST RESULTS */
+function resultBand(pct){
+  if(pct>=90) return {t:"Outstanding",c:"#0f7d8c",e:"🏆"};
+  if(pct>=75) return {t:"Very good",c:"#2e7d32",e:"🌟"};
+  if(pct>=60) return {t:"Good",c:"#5a2f9e",e:"👍"};
+  if(pct>=50) return {t:"Fair — room to improve",c:"#b8480f",e:"📈"};
+  return {t:"Needs improvement",c:"#e2372a",e:"💪"};
+}
+async function viewResults(mount,r){
+  const tests=await db.tests();
+  if(!Auth.canManage){
+    const mine=await db.myTestResults(Auth.user.id);
+    const byTest=Object.fromEntries(mine.map(x=>[x.test_id,x]));
+    const shown=tests.filter(t=>byTest[t.id]);
+    mount.innerHTML=`
+      <div class="page-h"><div><h1>My test results</h1><p>🔒 Only you can see your marks — no other participant can see them.</p></div></div>
+      ${shown.length?`<div class="stack">${shown.map(t=>{
+        const x=byTest[t.id]; const tot=Number(t.total_marks);
+        if(x.marks==null) return `<div class="card card--pad rescard">
+          <div class="rescard__h"><div><h3>${esc(t.title)}</h3><span class="muted">${t.held_on?fmtDate(t.held_on):""}${t.description?` · ${esc(t.description)}`:""}</span></div></div>
+          <div class="rescard__abs">Absent — you did not appear for this test.</div></div>`;
+        const m=Number(x.marks), pct=Math.round(m/tot*10000)/100, b=resultBand(pct);
+        return `<div class="card card--pad rescard">
+          <div class="rescard__h"><div><h3>${esc(t.title)}</h3><span class="muted">${t.held_on?fmtDate(t.held_on):""}${t.description?` · ${esc(t.description)}`:""}</span></div>
+            <span class="rescard__band" style="color:${b.c};border-color:${b.c}">${b.e} ${b.t}</span></div>
+          <div class="rescard__body">
+            <div class="rescard__score"><b>${m%1?m.toFixed(2):m}</b><span>/ ${tot%1?tot.toFixed(2):tot}</span></div>
+            <div class="rescard__pct"><div class="rescard__track"><div style="width:${Math.min(100,pct)}%;background:${b.c}"></div></div><span>${pct.toFixed(2)}%</span></div>
+          </div>
+          ${x.remarks?`<p class="muted" style="font-size:.85rem;margin:.6rem 0 0">${esc(x.remarks)}</p>`:""}
+        </div>`;}).join("")}</div>`
+      :emptyBlock("No results yet","Your monthly test results will appear here once they are published.",I.award)}`;
+    return;
+  }
+  // trainers / admins: full list per test
+  if(!tests.length){ mount.innerHTML=`<div class="page-h"><div><h1>Test results</h1></div></div>${emptyBlock("No tests yet","",I.award)}`; return; }
+  const cur=tests.find(t=>t.id===r.id)||tests[0];
+  const [rows,profs]=await Promise.all([db.allTestResults(cur.id), sb.from("profiles").select("id,full_name,emp_no,team").then(x=>x.data||[])]);
+  const pm=Object.fromEntries(profs.map(p=>[p.id,p]));
+  const tot=Number(cur.total_marks);
+  const list=rows.map(x=>({...x,p:pm[x.user_id]||{}})).sort((a,b)=>(b.marks??-1)-(a.marks??-1)||String(a.p.full_name).localeCompare(b.p.full_name));
+  const sat=list.filter(x=>x.marks!=null), avg=sat.length?sat.reduce((s,x)=>s+Number(x.marks),0)/sat.length:0;
+  mount.innerHTML=`
+    <div class="page-h"><div><h1>Test results</h1><p>Trainer / admin view. Each participant sees only their own marks on their "My test results" page.</p></div>
+      <button class="btn btn--ghost btn--sm" data-csv>${I.inbox} Download CSV</button></div>
+    ${tests.length>1?`<div class="lbtabs">${tests.map(t=>`<a href="#/results/${t.id}" class="${t.id===cur.id?"on":""}">${esc(t.title)}</a>`).join("")}</div>`:""}
+    <div class="card card--pad">
+      <div class="lbhead"><h2>${esc(cur.title)}</h2><span class="muted">${cur.held_on?fmtDate(cur.held_on)+" · ":""}${list.length} participants · ${sat.length} appeared · average ${avg.toFixed(2)} / ${tot}</span></div>
+      <div style="overflow-x:auto"><table class="lb"><thead><tr><th>Emp no</th><th>Name</th><th style="text-align:right">Marks</th><th style="text-align:right">%</th></tr></thead><tbody>
+      ${list.map(x=>`<tr><td class="muted">${esc(x.p.emp_no||"")}</td><td>${esc(x.p.full_name||"—")}</td>
+        <td style="text-align:right"><b>${x.marks==null?`<span class="muted">Absent</span>`:Number(x.marks)}</b></td>
+        <td style="text-align:right" class="muted">${x.marks==null?"—":(Number(x.marks)/tot*100).toFixed(2)}</td></tr>`).join("")}
+      </tbody></table></div>
+    </div>`;
+  $("[data-csv]").addEventListener("click",()=>{
+    const csv=[["Emp no","Name","Marks","Out of","Percentage"],...list.map(x=>[x.p.emp_no,x.p.full_name,x.marks==null?"Absent":x.marks,tot,x.marks==null?"":(Number(x.marks)/tot*100).toFixed(2)])]
+      .map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download=cur.title.replace(/[^a-z0-9]+/gi,"_")+".csv"; a.click();
   });
 }
 

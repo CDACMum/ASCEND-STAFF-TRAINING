@@ -890,3 +890,18 @@ td .git:hover{text-decoration:underline}
   .nring{width:76px;height:76px}.nring__in{width:58px;height:58px}.nring__in b{font-size:1.05rem}
   .ngrid{grid-template-columns:1fr}.rnavs{grid-template-columns:1fr}.nchip--u{margin-left:0}
 }
+
+/* monthly test results */
+.rescard__h{display:flex;justify-content:space-between;align-items:flex-start;gap:.8rem;flex-wrap:wrap}
+.rescard__h h3{font-family:var(--font-d);font-size:1.2rem;margin:0 0 .15rem}
+.rescard__h .muted{font-size:.85rem}
+.rescard__band{font-size:.8rem;font-weight:700;border:1.5px solid;border-radius:999px;padding:.2rem .65rem;white-space:nowrap}
+.rescard__body{display:flex;align-items:center;gap:1.4rem;margin-top:1rem;flex-wrap:wrap}
+.rescard__score{font-family:var(--font-d);line-height:1}
+.rescard__score b{font-size:3rem;letter-spacing:-.03em}
+.rescard__score span{font-size:1.2rem;color:var(--muted);margin-left:.3rem}
+.rescard__pct{flex:1;min-width:180px;display:flex;align-items:center;gap:.7rem}
+.rescard__pct span{font-family:var(--font-d);font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums}
+.rescard__track{flex:1;height:12px;border-radius:999px;background:var(--line);overflow:hidden}
+.rescard__track div{height:100%;border-radius:999px}
+.rescard__abs{margin-top:.8rem;font-weight:600;color:var(--muted)}
