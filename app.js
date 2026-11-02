@@ -406,6 +406,21 @@ const db = {
     if(DEMO) return [];
     const {data,error}=await sb.from("test_results").select("*").eq("test_id",testId); if(error) throw error; return data||[];
   },
+  /* ---- attendance: RLS returns only the signed-in person's own rows (managers see all) ---- */
+  async myAttendance(userId){
+    if(DEMO) return [];
+    const {data,error}=await sb.from("attendance_records").select("session_date,status").eq("user_id",userId).order("session_date"); if(error) throw error; return data||[];
+  },
+  async allAttendance(){
+    if(DEMO) return [];
+    let out=[], from=0;
+    for(;;){ const {data,error}=await sb.from("attendance_records").select("user_id,session_date,status").order("session_date").range(from,from+999);
+      if(error) throw error; out=out.concat(data||[]); if(!data||data.length<1000) break; from+=1000; }
+    return out;
+  },
+  async saveAttendance(rows){
+    for(let i=0;i<rows.length;i+=500){ const {error}=await sb.from("attendance_records").upsert(rows.slice(i,i+500),{onConflict:"user_id,session_date"}); if(error) throw error; }
+  },
   async contestBoard(qid){
     if(DEMO) return DemoStore.contestBoard(qid);
     const {data,error}=await sb.rpc("contest_leaderboard",{qid}); if(error) throw error; return data||[];
@@ -579,7 +594,7 @@ async function render(){
       dashboard:viewDashboard, courses:viewCourses, course:viewCourse,
       notes:viewNotes, note:viewNote, prereq:viewPrereq,
       assignments:viewAssignments, assignment:viewAssignment,
-      quizzes:viewQuizzes, quiz:viewQuiz, leaderboard:viewLeaderboard, results:viewResults,
+      quizzes:viewQuizzes, quiz:viewQuiz, leaderboard:viewLeaderboard, results:viewResults, attendance:viewAttendance,
       playground:viewPlayground,
       capstone:viewCapstone,
       schedule:viewSchedule, recordings:viewRecordings, session:viewSession,
@@ -708,8 +723,8 @@ function navForRole(){
     {name:"capstone",label:"Capstone project",icon:I.rocket},
     {name:"forum",label:"Discussion forum",icon:I.chat},
   ];
-  const staffExtra=[{name:"submissions",label:"My submissions",icon:I.inbox},{name:"results",label:"My test results",icon:I.award}];
-  const mgrExtra=[{name:"review",label:"Review work",icon:I.inbox},{name:"results",label:"Test results",icon:I.award}];
+  const staffExtra=[{name:"submissions",label:"My submissions",icon:I.inbox},{name:"results",label:"My test results",icon:I.award},{name:"attendance",label:"My attendance",icon:I.cal}];
+  const mgrExtra=[{name:"review",label:"Review work",icon:I.inbox},{name:"results",label:"Test results",icon:I.award},{name:"attendance",label:"Attendance",icon:I.cal}];
   const learning = Auth.canManage ? [...base, ...mgrExtra] : [...base, ...staffExtra];
   const admin = Auth.isAdmin ? [{name:"admin",label:"Manage people",icon:I.award}] : [];
   return {learning, admin};
@@ -2576,6 +2591,151 @@ async function viewResults(mount,r){
     const csv=[["Emp no","Name","Marks","Out of","Percentage"],...list.map(x=>[x.p.emp_no,x.p.full_name,x.marks==null?"Absent":x.marks,tot,x.marks==null?"":(Number(x.marks)/tot*100).toFixed(2)])]
       .map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
     const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download=cur.title.replace(/[^a-z0-9]+/gi,"_")+".csv"; a.click();
+  });
+}
+
+/* ========================================================= ATTENDANCE */
+const ATT_TARGET=75; // % that needs attention (same as the sheet's Config)
+const ATT_LBL={P:"Present",S:"Short (under 60 min)",A:"Absent"};
+function attSummary(recs){
+  const n=recs.length, p=recs.filter(r=>r.status==="P").length, sh=recs.filter(r=>r.status==="S").length, a=recs.filter(r=>r.status==="A").length;
+  return {n,p,s:sh,a,pct:n?Math.round(p/n*100):0};
+}
+function attDay(d){ return new Date(d+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",weekday:"short"}); }
+function attMonths(recs){
+  const m={}; recs.forEach(r=>{ const k=r.session_date.slice(0,7); (m[k]=m[k]||[]).push(r); });
+  return Object.entries(m).map(([k,v])=>({k,label:new Date(k+"-01T00:00:00").toLocaleDateString("en-IN",{month:"long",year:"numeric"}),recs:v,sum:attSummary(v)}));
+}
+function attDetailHTML(recs){
+  return attMonths(recs).map(mo=>`
+    <div class="attmon"><div class="attmon__h"><b>${esc(mo.label)}</b><span class="muted">${mo.sum.p} of ${mo.sum.n} present · ${mo.sum.pct}%</span></div>
+      <div class="attdays">${mo.recs.map(r=>`<span class="attday attday--${r.status}" title="${esc(ATT_LBL[r.status])}"><i>${r.status}</i>${esc(attDay(r.session_date))}</span>`).join("")}</div></div>`).join("");
+}
+function attLegend(){ return `<div class="attlegend"><span class="attday attday--P"><i>P</i>Present</span><span class="attday attday--S"><i>S</i>Short — joined for under 60 min</span><span class="attday attday--A"><i>A</i>Absent</span></div>`; }
+
+async function viewAttendance(mount){
+  if(!Auth.canManage){
+    const recs=await db.myAttendance(Auth.user.id);
+    if(!recs.length){ mount.innerHTML=`<div class="page-h"><div><h1>My attendance</h1></div></div>${emptyBlock("No attendance yet","Your attendance will appear here once it has been recorded.",I.cal)}`; return; }
+    const s=attSummary(recs), low=s.pct<ATT_TARGET;
+    mount.innerHTML=`
+      <div class="page-h"><div><h1>My attendance</h1><p>🔒 Only you can see your attendance. Sessions ${fmtDate(recs[0].session_date)} – ${fmtDate(recs[recs.length-1].session_date)}.</p></div></div>
+      <div class="attstats">
+        <div class="attstat attstat--big ${low?"attstat--low":""}"><b>${s.pct}%</b><span>Attendance</span></div>
+        <div class="attstat"><b>${s.p}</b><span>Present</span></div>
+        <div class="attstat"><b>${s.s}</b><span>Short</span></div>
+        <div class="attstat"><b>${s.a}</b><span>Absent</span></div>
+        <div class="attstat"><b>${s.n}</b><span>Sessions</span></div>
+      </div>
+      <div class="attnote ${low?"attnote--low":""}">${low
+        ?`⚠️ Your attendance is below ${ATT_TARGET}%. You need to attend sessions for the full duration — a session counts as present only when you stay for at least 60 minutes.`
+        :`✅ You are above the ${ATT_TARGET}% attendance requirement. Keep it up!`}</div>
+      <div class="card card--pad"><div class="section-h" style="margin-top:0"><h2>Session by session</h2></div>${attLegend()}${attDetailHTML(recs)}</div>`;
+    return;
+  }
+  // trainers / admins
+  const [recs,profs]=await Promise.all([db.allAttendance(), sb.from("profiles").select("id,full_name,emp_no,team,role").then(x=>x.data||[])]);
+  const pm=Object.fromEntries(profs.map(p=>[p.id,p]));
+  const by={}; recs.forEach(r=>{ (by[r.user_id]=by[r.user_id]||[]).push(r); });
+  const dates=[...new Set(recs.map(r=>r.session_date))].sort();
+  let people=Object.entries(by).map(([uid,v])=>({uid,p:pm[uid]||{},recs:v,sum:attSummary(v)})).filter(x=>x.p.emp_no!=="100000");
+  const avg=people.length?Math.round(people.reduce((t,x)=>t+x.sum.pct,0)/people.length):0;
+  const lowN=people.filter(x=>x.sum.pct<ATT_TARGET).length;
+  let sort="pct", q="", onlyLow=false;
+  const paint=()=>{
+    let list=people.filter(x=>!q||(`${x.p.full_name} ${x.p.emp_no}`).toLowerCase().includes(q)).filter(x=>!onlyLow||x.sum.pct<ATT_TARGET);
+    list.sort(sort==="name"?(a,b)=>String(a.p.full_name).localeCompare(b.p.full_name):(a,b)=>a.sum.pct-b.sum.pct||String(a.p.full_name).localeCompare(b.p.full_name));
+    $("[data-attbody]").innerHTML=list.map(x=>`
+      <tr class="attrow" data-uid="${x.uid}"><td class="muted">${esc(x.p.emp_no||"")}</td><td>${esc(x.p.full_name||"—")}</td><td class="muted">${esc(x.p.team||"")}</td>
+        <td style="text-align:right">${x.sum.p}</td><td style="text-align:right">${x.sum.s}</td><td style="text-align:right">${x.sum.a}</td>
+        <td style="text-align:right"><b class="${x.sum.pct<ATT_TARGET?"flame":"teal"}">${x.sum.pct}%</b></td></tr>
+      <tr class="attexp hidden" data-exp="${x.uid}"><td colspan="7">${attDetailHTML(x.recs)}</td></tr>`).join("")||`<tr><td colspan="7" class="muted">No one matches.</td></tr>`;
+    mount.querySelectorAll(".attrow").forEach(tr=>tr.addEventListener("click",()=>mount.querySelector(`[data-exp="${tr.dataset.uid}"]`).classList.toggle("hidden")));
+  };
+  mount.innerHTML=`
+    <div class="page-h"><div><h1>Attendance</h1><p>Trainer / admin view. Each participant sees only their own attendance on their "My attendance" page.</p></div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn btn--ghost btn--sm" data-csv>${I.inbox} Download CSV</button>
+      <button class="btn btn--primary btn--sm" data-import>${I.plus} Update from sheet (CSV)</button></div></div>
+    <div class="attstats">
+      <div class="attstat"><b>${people.length}</b><span>Participants</span></div>
+      <div class="attstat"><b>${dates.length}</b><span>Sessions</span></div>
+      <div class="attstat"><b>${avg}%</b><span>Average attendance</span></div>
+      <div class="attstat attstat--low"><b>${lowN}</b><span>Below ${ATT_TARGET}%</span></div>
+    </div>
+    <div class="card card--pad">
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:.8rem">
+        <input class="input" data-q placeholder="Search name or employee no." style="max-width:280px"/>
+        <select data-sort class="input" style="max-width:200px"><option value="pct">Lowest attendance first</option><option value="name">Name A–Z</option></select>
+        <label style="display:flex;gap:.35rem;align-items:center;font-size:.9rem"><input type="checkbox" data-low/> Only below ${ATT_TARGET}%</label>
+        <span class="muted" style="font-size:.8rem;margin-left:auto">${dates.length?`${fmtDate(dates[0])} – ${fmtDate(dates[dates.length-1])} · click a row for day-wise detail`:""}</span>
+      </div>
+      <div style="overflow-x:auto"><table class="lb"><thead><tr><th>Emp no</th><th>Name</th><th>Location</th><th style="text-align:right">P</th><th style="text-align:right">S</th><th style="text-align:right">A</th><th style="text-align:right">%</th></tr></thead>
+      <tbody data-attbody></tbody></table></div>
+      ${attLegend()}
+    </div>`;
+  paint();
+  $("[data-q]").addEventListener("input",e=>{ q=e.target.value.trim().toLowerCase(); paint(); });
+  $("[data-sort]").addEventListener("change",e=>{ sort=e.target.value; paint(); });
+  $("[data-low]").addEventListener("change",e=>{ onlyLow=e.target.checked; paint(); });
+  $("[data-csv]").addEventListener("click",()=>{
+    const head=["Emp no","Name","Location","Present","Short","Absent","Sessions","Attendance %",...dates];
+    const body=people.sort((a,b)=>String(a.p.full_name).localeCompare(b.p.full_name)).map(x=>{ const m=Object.fromEntries(x.recs.map(r=>[r.session_date,r.status]));
+      return [x.p.emp_no,x.p.full_name,x.p.team,x.sum.p,x.sum.s,x.sum.a,x.sum.n,x.sum.pct,...dates.map(d=>m[d]||"")]; });
+    const csv=[head,...body].map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="ASCEND_attendance.csv"; a.click();
+  });
+  $("[data-import]").addEventListener("click",()=>attImport(profs));
+}
+
+/* admin: re-load attendance from the Google Sheet's "Attendance" tab (File → Download → CSV) */
+function parseCSV(text){
+  const rows=[]; let row=[], cur="", q=false;
+  for(let i=0;i<text.length;i++){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else if(c==='"') q=true; else if(c===','){ row.push(cur); cur=""; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(cur); rows.push(row); row=[]; cur=""; }
+    else cur+=c; }
+  if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+const nameKey=(n)=>String(n||"").toLowerCase().replace(/[.,]/g," ").split(/\s+/).filter(w=>w&&!["mr","ms","mrs","dr","shri","smt"].includes(w)).sort().join(" ");
+function toISO(h){
+  h=String(h||"").trim(); if(/^\d{4}-\d{2}-\d{2}$/.test(h)) return h;
+  const m=h.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/); if(m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`; // DD/MM/YYYY
+  return null;
+}
+function attImport(profs){
+  openModal({title:"Update attendance from the sheet", wide:true,
+    bodyHTML:`<p class="muted" style="margin-top:0">In the Google Sheet open the <b>Attendance</b> tab → <b>File → Download → Comma-separated values (.csv)</b>, then choose that file here. Existing days are updated and new days are added; nothing is deleted.</p>
+      <input type="file" accept=".csv,text/csv" data-file class="input"/>
+      <div data-preview style="margin-top:1rem"></div>`,
+    footerHTML:`<button class="btn btn--ghost" data-cancel>Cancel</button><button class="btn btn--primary" data-save disabled>Save attendance</button>`});
+  $("[data-cancel]").addEventListener("click",closeModal);
+  const keyMap={}; profs.filter(p=>p.role==="staff").forEach(p=>{ const k=nameKey(p.full_name); keyMap[k]=keyMap[k]?"DUP":p; });
+  let rows=[];
+  $("[data-file]").addEventListener("change",async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const grid=parseCSV(await f.text());
+    const hi=grid.findIndex(r=>r.some(c=>toISO(c)));
+    const pv=$("[data-preview]"), btn=$("[data-save]");
+    if(hi<0){ pv.innerHTML=`<p class="flame">Couldn't find the date columns. Make sure you downloaded the <b>Attendance</b> tab.</p>`; return; }
+    const hdr=grid[hi], dcols=hdr.map((c,i)=>[i,toISO(c)]).filter(x=>x[1]);
+    const nameCol=hdr.findIndex(c=>/name/i.test(c)); const nc=nameCol>=0?nameCol:1;
+    rows=[]; const unmatched=[];
+    grid.slice(hi+1).forEach(r=>{
+      const nm=(r[nc]||"").trim(); if(!nm||/present count/i.test(nm)) return;
+      const p=keyMap[nameKey(nm)]; if(!p||p==="DUP"){ unmatched.push(nm); return; }
+      dcols.forEach(([i,d])=>{ const v=(r[i]||"").trim().toUpperCase(); if(["P","S","A"].includes(v)) rows.push({user_id:p.id,session_date:d,status:v}); });
+    });
+    const people=new Set(rows.map(r=>r.user_id)).size;
+    pv.innerHTML=`<div class="attnote">Found <b>${dcols.length}</b> session dates (${esc(dcols[0][1])} → ${esc(dcols[dcols.length-1][1])}) and <b>${people}</b> participants — <b>${rows.length}</b> records ready to save.</div>
+      ${unmatched.length?`<p class="flame" style="font-size:.9rem">⚠️ ${unmatched.length} name(s) not matched to a portal account and will be skipped: ${unmatched.map(esc).join(", ")}</p>`:""}`;
+    btn.disabled=!rows.length;
+  });
+  $("[data-save]").addEventListener("click",async()=>{
+    const btn=$("[data-save]"); btn.disabled=true; btn.textContent="Saving…";
+    try{ await db.saveAttendance(rows); toast(`Attendance updated — ${rows.length} records`); closeModal(); render(); }
+    catch(err){ toast(err.message||String(err),"err"); btn.disabled=false; btn.textContent="Save attendance"; }
   });
 }
 

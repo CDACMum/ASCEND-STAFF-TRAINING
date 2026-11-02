@@ -905,3 +905,23 @@ td .git:hover{text-decoration:underline}
 .rescard__track{flex:1;height:12px;border-radius:999px;background:var(--line);overflow:hidden}
 .rescard__track div{height:100%;border-radius:999px}
 .rescard__abs{margin-top:.8rem;font-weight:600;color:var(--muted)}
+
+/* attendance */
+.attstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.8rem;margin-bottom:1rem}
+.attstat{background:var(--card);border:1px solid var(--line);border-radius:var(--r-sm);padding:.9rem 1rem;box-shadow:var(--shadow)}
+.attstat b{display:block;font-family:var(--font-d);font-size:1.7rem;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.attstat span{font-size:.8rem;color:var(--muted)}
+.attstat--big b{font-size:2.3rem;color:var(--teal)}
+.attstat--low b{color:var(--ember)}
+.attnote{border-radius:var(--r-sm);padding:.75rem 1rem;margin-bottom:1rem;background:rgba(15,125,140,.08);border:1px solid rgba(15,125,140,.25);font-size:.92rem}
+.attnote--low{background:rgba(226,55,42,.07);border-color:rgba(226,55,42,.3)}
+.attlegend{display:flex;gap:.5rem;flex-wrap:wrap;margin:.4rem 0 1rem}
+.attmon{margin-bottom:1rem}
+.attmon__h{display:flex;gap:.8rem;align-items:baseline;margin-bottom:.45rem;flex-wrap:wrap}
+.attmon__h span{font-size:.85rem}
+.attdays{display:flex;flex-wrap:wrap;gap:.4rem}
+.attday{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;padding:.25rem .55rem .25rem .25rem;border-radius:999px;border:1px solid var(--line);background:var(--card)}
+.attday i{font-style:normal;font-weight:700;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:.72rem}
+.attday--P i{background:var(--teal)} .attday--S i{background:#d98f00} .attday--A i{background:var(--ember)}
+.attrow{cursor:pointer} .attrow:hover td{background:var(--paper-2)}
+.attexp td{background:var(--paper-2);padding:1rem}
