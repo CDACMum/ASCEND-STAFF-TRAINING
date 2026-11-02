@@ -925,3 +925,6 @@ td .git:hover{text-decoration:underline}
 .attday--P i{background:var(--teal)} .attday--S i{background:#d98f00} .attday--A i{background:var(--ember)}
 .attrow{cursor:pointer} .attrow:hover td{background:var(--paper-2)}
 .attexp td{background:var(--paper-2);padding:1rem}
+.sortth{cursor:pointer;user-select:none;white-space:nowrap}
+.sortth i{font-style:normal;font-size:.7rem;color:var(--muted-2);margin-left:.2rem}
+.sortth.on{color:var(--violet)} .sortth.on i{color:var(--violet)}

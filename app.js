@@ -2596,10 +2596,12 @@ async function viewResults(mount,r){
 
 /* ========================================================= ATTENDANCE */
 const ATT_TARGET=75; // % that needs attention (same as the sheet's Config)
+const ATT_SHORT_COUNTS=true; // for now a Short (S) day counts as attended; set false to count only P
 const ATT_LBL={P:"Present",S:"Short (under 60 min)",A:"Absent"};
 function attSummary(recs){
   const n=recs.length, p=recs.filter(r=>r.status==="P").length, sh=recs.filter(r=>r.status==="S").length, a=recs.filter(r=>r.status==="A").length;
-  return {n,p,s:sh,a,pct:n?Math.round(p/n*100):0};
+  const att=ATT_SHORT_COUNTS?p+sh:p;
+  return {n,p,s:sh,a,att,pct:n?Math.round(att/n*100):0,apct:n?Math.round(a/n*100):0};
 }
 function attDay(d){ return new Date(d+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",weekday:"short"}); }
 function attMonths(recs){
@@ -2608,10 +2610,10 @@ function attMonths(recs){
 }
 function attDetailHTML(recs){
   return attMonths(recs).map(mo=>`
-    <div class="attmon"><div class="attmon__h"><b>${esc(mo.label)}</b><span class="muted">${mo.sum.p} of ${mo.sum.n} present · ${mo.sum.pct}%</span></div>
+    <div class="attmon"><div class="attmon__h"><b>${esc(mo.label)}</b><span class="muted">${mo.sum.att} of ${mo.sum.n} attended · ${mo.sum.pct}%</span></div>
       <div class="attdays">${mo.recs.map(r=>`<span class="attday attday--${r.status}" title="${esc(ATT_LBL[r.status])}"><i>${r.status}</i>${esc(attDay(r.session_date))}</span>`).join("")}</div></div>`).join("");
 }
-function attLegend(){ return `<div class="attlegend"><span class="attday attday--P"><i>P</i>Present</span><span class="attday attday--S"><i>S</i>Short — joined for under 60 min</span><span class="attday attday--A"><i>A</i>Absent</span></div>`; }
+function attLegend(){ return `<div class="attlegend"><span class="attday attday--P"><i>P</i>Present</span><span class="attday attday--S"><i>S</i>Short — joined for under 60 min${ATT_SHORT_COUNTS?" (counted as attended)":""}</span><span class="attday attday--A"><i>A</i>Absent</span></div>`; }
 
 async function viewAttendance(mount){
   if(!Auth.canManage){
@@ -2622,13 +2624,14 @@ async function viewAttendance(mount){
       <div class="page-h"><div><h1>My attendance</h1><p>🔒 Only you can see your attendance. Sessions ${fmtDate(recs[0].session_date)} – ${fmtDate(recs[recs.length-1].session_date)}.</p></div></div>
       <div class="attstats">
         <div class="attstat attstat--big ${low?"attstat--low":""}"><b>${s.pct}%</b><span>Attendance</span></div>
-        <div class="attstat"><b>${s.p}</b><span>Present</span></div>
-        <div class="attstat"><b>${s.s}</b><span>Short</span></div>
-        <div class="attstat"><b>${s.a}</b><span>Absent</span></div>
+        <div class="attstat"><b>${s.apct}%</b><span>Absent</span></div>
+        <div class="attstat"><b>${s.p}</b><span>Present days</span></div>
+        <div class="attstat"><b>${s.s}</b><span>Short days</span></div>
+        <div class="attstat"><b>${s.a}</b><span>Absent days</span></div>
         <div class="attstat"><b>${s.n}</b><span>Sessions</span></div>
       </div>
       <div class="attnote ${low?"attnote--low":""}">${low
-        ?`⚠️ Your attendance is below ${ATT_TARGET}%. You need to attend sessions for the full duration — a session counts as present only when you stay for at least 60 minutes.`
+        ?`⚠️ Your attendance is below ${ATT_TARGET}%. Please attend the remaining sessions regularly.`
         :`✅ You are above the ${ATT_TARGET}% attendance requirement. Keep it up!`}</div>
       <div class="card card--pad"><div class="section-h" style="margin-top:0"><h2>Session by session</h2></div>${attLegend()}${attDetailHTML(recs)}</div>`;
     return;
@@ -2641,15 +2644,19 @@ async function viewAttendance(mount){
   let people=Object.entries(by).map(([uid,v])=>({uid,p:pm[uid]||{},recs:v,sum:attSummary(v)})).filter(x=>x.p.emp_no!=="100000");
   const avg=people.length?Math.round(people.reduce((t,x)=>t+x.sum.pct,0)/people.length):0;
   const lowN=people.filter(x=>x.sum.pct<ATT_TARGET).length;
-  let sort="pct", q="", onlyLow=false;
+  let sort="pct-asc", q="", onlyLow=false;
+  const SORTS={"pct-asc":(a,b)=>a.sum.pct-b.sum.pct,"pct-desc":(a,b)=>b.sum.pct-a.sum.pct,"apct-desc":(a,b)=>b.sum.apct-a.sum.apct,"apct-asc":(a,b)=>a.sum.apct-b.sum.apct,"name":()=>0};
   const paint=()=>{
     let list=people.filter(x=>!q||(`${x.p.full_name} ${x.p.emp_no}`).toLowerCase().includes(q)).filter(x=>!onlyLow||x.sum.pct<ATT_TARGET);
-    list.sort(sort==="name"?(a,b)=>String(a.p.full_name).localeCompare(b.p.full_name):(a,b)=>a.sum.pct-b.sum.pct||String(a.p.full_name).localeCompare(b.p.full_name));
+    list.sort((a,b)=>SORTS[sort](a,b)||String(a.p.full_name).localeCompare(b.p.full_name));
+    mount.querySelectorAll("[data-sortcol]").forEach(th=>{ const k=th.dataset.sortcol; th.classList.toggle("on",sort.startsWith(k+"-")); th.querySelector("i").textContent=sort===k+"-asc"?"▲":sort===k+"-desc"?"▼":"↕"; });
+    const sel=$("[data-sort]"); if(sel) sel.value=sort;
     $("[data-attbody]").innerHTML=list.map(x=>`
       <tr class="attrow" data-uid="${x.uid}"><td class="muted">${esc(x.p.emp_no||"")}</td><td>${esc(x.p.full_name||"—")}</td><td class="muted">${esc(x.p.team||"")}</td>
         <td style="text-align:right">${x.sum.p}</td><td style="text-align:right">${x.sum.s}</td><td style="text-align:right">${x.sum.a}</td>
-        <td style="text-align:right"><b class="${x.sum.pct<ATT_TARGET?"flame":"teal"}">${x.sum.pct}%</b></td></tr>
-      <tr class="attexp hidden" data-exp="${x.uid}"><td colspan="7">${attDetailHTML(x.recs)}</td></tr>`).join("")||`<tr><td colspan="7" class="muted">No one matches.</td></tr>`;
+        <td style="text-align:right"><b class="${x.sum.pct<ATT_TARGET?"flame":"teal"}">${x.sum.pct}%</b></td>
+        <td style="text-align:right" class="${x.sum.apct>100-ATT_TARGET?"flame":"muted"}">${x.sum.apct}%</td></tr>
+      <tr class="attexp hidden" data-exp="${x.uid}"><td colspan="8">${attDetailHTML(x.recs)}</td></tr>`).join("")||`<tr><td colspan="8" class="muted">No one matches.</td></tr>`;
     mount.querySelectorAll(".attrow").forEach(tr=>tr.addEventListener("click",()=>mount.querySelector(`[data-exp="${tr.dataset.uid}"]`).classList.toggle("hidden")));
   };
   mount.innerHTML=`
@@ -2660,27 +2667,29 @@ async function viewAttendance(mount){
       <div class="attstat"><b>${people.length}</b><span>Participants</span></div>
       <div class="attstat"><b>${dates.length}</b><span>Sessions</span></div>
       <div class="attstat"><b>${avg}%</b><span>Average attendance</span></div>
+      <div class="attstat"><b>${people.length?Math.round(people.reduce((t,x)=>t+x.sum.apct,0)/people.length):0}%</b><span>Average absent</span></div>
       <div class="attstat attstat--low"><b>${lowN}</b><span>Below ${ATT_TARGET}%</span></div>
     </div>
     <div class="card card--pad">
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:.8rem">
         <input class="input" data-q placeholder="Search name or employee no." style="max-width:280px"/>
-        <select data-sort class="input" style="max-width:200px"><option value="pct">Lowest attendance first</option><option value="name">Name A–Z</option></select>
+        <select data-sort class="input" style="max-width:230px"><option value="pct-asc">Present % — lowest first</option><option value="pct-desc">Present % — highest first</option><option value="apct-desc">Absent % — highest first</option><option value="apct-asc">Absent % — lowest first</option><option value="name">Name A–Z</option></select>
         <label style="display:flex;gap:.35rem;align-items:center;font-size:.9rem"><input type="checkbox" data-low/> Only below ${ATT_TARGET}%</label>
-        <span class="muted" style="font-size:.8rem;margin-left:auto">${dates.length?`${fmtDate(dates[0])} – ${fmtDate(dates[dates.length-1])} · click a row for day-wise detail`:""}</span>
+        <span class="muted" style="font-size:.8rem;margin-left:auto">${dates.length?`${fmtDate(dates[0])} – ${fmtDate(dates[dates.length-1])} · Present % = (P${ATT_SHORT_COUNTS?" + S":""}) ÷ sessions · click a row for day-wise detail`:""}</span>
       </div>
-      <div style="overflow-x:auto"><table class="lb"><thead><tr><th>Emp no</th><th>Name</th><th>Location</th><th style="text-align:right">P</th><th style="text-align:right">S</th><th style="text-align:right">A</th><th style="text-align:right">%</th></tr></thead>
+      <div style="overflow-x:auto"><table class="lb"><thead><tr><th>Emp no</th><th>Name</th><th>Location</th><th style="text-align:right">P</th><th style="text-align:right">S</th><th style="text-align:right">A</th><th style="text-align:right" class="sortth" data-sortcol="pct">Present % <i>↕</i></th><th style="text-align:right" class="sortth" data-sortcol="apct">Absent % <i>↕</i></th></tr></thead>
       <tbody data-attbody></tbody></table></div>
       ${attLegend()}
     </div>`;
   paint();
   $("[data-q]").addEventListener("input",e=>{ q=e.target.value.trim().toLowerCase(); paint(); });
   $("[data-sort]").addEventListener("change",e=>{ sort=e.target.value; paint(); });
+  mount.querySelectorAll("[data-sortcol]").forEach(th=>th.addEventListener("click",()=>{ const k=th.dataset.sortcol; sort=sort===k+"-asc"?k+"-desc":k+"-asc"; paint(); }));
   $("[data-low]").addEventListener("change",e=>{ onlyLow=e.target.checked; paint(); });
   $("[data-csv]").addEventListener("click",()=>{
-    const head=["Emp no","Name","Location","Present","Short","Absent","Sessions","Attendance %",...dates];
+    const head=["Emp no","Name","Location","Present","Short","Absent","Sessions","Present %","Absent %",...dates];
     const body=people.sort((a,b)=>String(a.p.full_name).localeCompare(b.p.full_name)).map(x=>{ const m=Object.fromEntries(x.recs.map(r=>[r.session_date,r.status]));
-      return [x.p.emp_no,x.p.full_name,x.p.team,x.sum.p,x.sum.s,x.sum.a,x.sum.n,x.sum.pct,...dates.map(d=>m[d]||"")]; });
+      return [x.p.emp_no,x.p.full_name,x.p.team,x.sum.p,x.sum.s,x.sum.a,x.sum.n,x.sum.pct,x.sum.apct,...dates.map(d=>m[d]||"")]; });
     const csv=[head,...body].map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
     const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="ASCEND_attendance.csv"; a.click();
   });
